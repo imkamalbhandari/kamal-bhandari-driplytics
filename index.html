@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driplytics - Detailed Technical Sequences</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; padding: 20px; line-height: 1.6; }
+        .container { max-width: 1100px; margin: auto; }
+        .feature-card { 
+            background: white; border-radius: 15px; margin-bottom: 60px; padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1); border-top: 6px solid #FF6C37;
+        }
+        .layout { display: flex; gap: 40px; align-items: flex-start; flex-wrap: wrap; }
+        .diagram { flex: 1.3; min-width: 550px; background: #fafafa; padding: 20px; border-radius: 10px; }
+        .info { flex: 0.7; min-width: 400px; }
+        
+        h2 { color: #1a1a1a; margin-top: 0; font-size: 24px; }
+        h4 { color: #FF6C37; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Sequence Component Styles */
+        .lifeline { stroke: #444; stroke-width: 1; stroke-dasharray: 6,4; }
+        .actor-box { fill: #202124; stroke: #000; rx: 4; }
+        .actor-text { fill: #fff; font-size: 11px; font-weight: 600; text-anchor: middle; }
+        .execution { fill: #fff; stroke: #FF6C37; stroke-width: 1.5; }
+        .msg-arrow { stroke: #333; stroke-width: 1.2; fill: none; marker-end: url(#arrowhead); }
+        .msg-return { stroke: #666; stroke-width: 1; fill: none; stroke-dasharray: 4,2; marker-end: url(#arrowhead); }
+        .msg-text { font-size: 10px; fill: #222; font-weight: 500; }
+
+        /* Detailed Table Styles */
+        table { width: 100%; border-collapse: collapse; background: #fff; font-size: 13px; }
+        th { background: #202124; color: white; padding: 12px; text-align: left; }
+        td { padding: 12px; border-bottom: 1px dotted #ccc; }
+        .step-num { font-weight: bold; color: #FF6C37; width: 30px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 style="text-align:center; margin-bottom:40px;">Driplytics: High-Detail Sequence Interactions</h1>
+
+    <!-- 1. DETAILED AUTHENTICATION -->
+    <div class="feature-card">
+        <h4>System Security</h4>
+        <h2>1. Multi-Factor Authentication & Session Issuance</h2>
+        <div class="layout">
+            <div class="diagram">
+                <svg width="550" height="450" viewBox="0 0 550 450">
+                    <defs><marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#333" /></marker></defs>
+                    
+                    <line x1="80" y1="40" x2="80" y2="400" class="lifeline"/>
+                    <line x1="220" y1="40" x2="220" y2="400" class="lifeline"/>
+                    <line x1="360" y1="40" x2="360" y2="400" class="lifeline"/>
+                    <line x1="480" y1="40" x2="480" y2="400" class="lifeline"/>
+
+                    <rect x="30" y="10" width="100" height="30" class="actor-box"/><text x="80" y="30" class="actor-text">User (React)</text>
+                    <rect x="170" y="10" width="100" height="30" class="actor-box"/><text x="220" y="30" class="actor-text">Auth Middleware</text>
+                    <rect x="310" y="10" width="100" height="30" class="actor-box"/><text x="360" y="30" class="actor-text">User DB</text>
+                    <rect x="430" y="10" width="100" height="30" class="actor-box"/><text x="480" y="30" class="actor-text">SMTP Service</text>
+
+                    <!-- Active Bars -->
+                    <rect x="215" y="80" width="10" height="250" class="execution"/>
+
+                    <path d="M80,80 L215,80" class="msg-arrow"/><text x="90" y="75" class="msg-text">1. submit(email, pass)</text>
+                    <path d="M225,100 L360,100" class="msg-arrow"/><text x="235" y="95" class="msg-text">2. findOne({email})</text>
+                    <path d="M360,130 L225,130" class="msg-return"/><text x="245" y="125" class="msg-text">3. UserHash (Bcrypt)</text>
+                    <path d="M225,160 L480,160" class="msg-arrow"/><text x="300" y="155" class="msg-text">4. dispatchOTP(code)</text>
+                    <path d="M80,240 L215,240" class="msg-arrow"/><text x="90" y="235" class="msg-text">5. verify(OTP_Input)</text>
+                    <path d="M225,270 L225,310 C250,310 250,270 225,270" class="msg-arrow"/><text x="235" y="295" class="msg-text">6. signJWT(payload)</text>
+                    <path d="M215,330 L80,330" class="msg-return"/><text x="90" y="325" class="msg-text">7. HTTPOnly Cookie Set</text>
+                </svg>
+            </div>
+            <div class="info">
+                <table>
+                    <thead><tr><th>#</th><th>Step Description</th></tr></thead>
+                    <tbody>
+                        <tr><td class="step-num">1</td><td>User sends encrypted credentials via POST request.</td></tr>
+                        <tr><td class="step-num">2-3</td><td>System retrieves hashed password and checks validity.</td></tr>
+                        <tr><td class="step-num">4</td><td>If valid, a temporary secret is cached and sent via Email.</td></tr>
+                        <tr><td class="step-num">5</td><td>User provides the 2FA token from their inbox.</td></tr>
+                        <tr><td class="step-num">6-7</td><td>Backend signs a 24h JWT token and issues it to the browser.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. DETAILED DATA AGGREGATION -->
+    <div class="feature-card">
+        <h4>Data Engineering</h4>
+        <h2>2. Multi-Source Market Data Aggregation</h2>
+        <div class="layout">
+            <div class="diagram">
+                <svg width="550" height="450" viewBox="0 0 550 450">
+                    <line x1="100" y1="40" x2="100" y2="400" class="lifeline"/>
+                    <line x1="250" y1="40" x2="250" y2="400" class="lifeline"/>
+                    <line x1="450" y1="40" x2="450" y2="400" class="lifeline"/>
+
+                    <rect x="50" y="10" width="100" height="30" class="actor-box"/><text x="100" y="30" class="actor-text">Search UI</text>
+                    <rect x="200" y="10" width="100" height="30" class="actor-box"/><text x="250" y="30" class="actor-text">Aggregation Controller</text>
+                    <rect x="400" y="10" width="100" height="30" class="actor-box"/><text x="450" y="30" class="actor-text">External API Pool</text>
+
+                    <rect x="245" y="80" width="10" height="280" class="execution"/>
+
+                    <path d="M100,80 L245,80" class="msg-arrow"/><text x="110" y="75" class="msg-text">1. GET /market?sku=AJ1-85</text>
+                    <path d="M255,110 L450,110" class="msg-arrow"/><text x="280" y="105" class="msg-text">2. fetchParallel(StockX, eBay)</text>
+                    <path d="M450,160 L255,160" class="msg-return"/><text x="280" y="155" class="msg-text">3. raw_payload_A, raw_payload_B</text>
+                    <path d="M255,200 L255,240 C290,240 290,200 255,200" class="msg-arrow"/><text x="265" y="225" class="msg-text">4. Normalizer(Currency, Sizes)</text>
+                    <path d="M255,270 L255,310 C290,310 290,270 255,270" class="msg-arrow"/><text x="265" y="295" class="msg-text">5. computeAverages()</text>
+                    <path d="M245,350 L100,350" class="msg-return"/><text x="110" y="345" class="msg-text">6. unifiedJSON_Response</text>
+                </svg>
+            </div>
+            <div class="info">
+                <table>
+                    <thead><tr><th>#</th><th>Step Description</th></tr></thead>
+                    <tbody>
+                        <tr><td class="step-num">1-2</td><td>UI initiates a search; Controller triggers parallel API calls.</td></tr>
+                        <tr><td class="step-num">3</td><td>Raw JSON responses are received from multiple marketplaces.</td></tr>
+                        <tr><td class="step-num">4</td><td>Logic handles currency conversion (USD to NPR) and size mapping.</td></tr>
+                        <tr><td class="step-num">5</td><td>System calculates the current "Market Average" across all sources.</td></tr>
+                        <tr><td class="step-num">6</td><td>Returns a cleaned, single object to populate the React state.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. DETAILED AI PREDICTION ENGINE -->
+    <div class="feature-card">
+        <h4>Core Intelligence</h4>
+        <h2>3. Time-Series AI Forecasting Engine</h2>
+        <div class="layout">
+            <div class="diagram">
+                <svg width="550" height="450" viewBox="0 0 550 450">
+                    <line x1="80" y1="40" x2="80" y2="400" class="lifeline"/>
+                    <line x1="220" y1="40" x2="220" y2="400" class="lifeline"/>
+                    <line x1="360" y1="40" x2="360" y2="400" class="lifeline"/>
+                    <line x1="480" y1="40" x2="480" y2="400" class="lifeline"/>
+
+                    <rect x="30" y="10" width="100" height="30" class="actor-box"/><text x="80" y="30" class="actor-text">Analytics Page</text>
+                    <rect x="170" y="10" width="100" height="30" class="actor-box"/><text x="220" y="30" class="actor-text">Backend API</text>
+                    <rect x="310" y="10" width="100" height="30" class="actor-box"/><text x="360" y="30" class="actor-text">ML Service (Python)</text>
+                    <rect x="430" y="10" width="100" height="30" class="actor-box"/><text x="480" y="30" class="actor-text">Prophet/RF Model</text>
+
+                    <rect x="355" y="110" width="10" height="230" class="execution"/>
+
+                    <path d="M80,80 L220,80" class="msg-arrow"/><text x="90" y="75" class="msg-text">1. requestForecast(price_history)</text>
+                    <path d="M220,110 L355,110" class="msg-arrow"/><text x="230" y="105" class="msg-text">2. POST /v1/predict (JSON)</text>
+                    <path d="M365,140 L365,180 C390,180 390,140 365,140" class="msg-arrow"/><text x="375" y="165" class="msg-text">3. Feature Engineering</text>
+                    <path d="M365,200 L480,200" class="msg-arrow"/><text x="380" y="195" class="msg-text">4. model.predict(X_val)</text>
+                    <path d="M480,240 L365,240" class="msg-return"/><text x="380" y="235" class="msg-text">5. float_array[30]</text>
+                    <path d="M355,300 L220,300" class="msg-return"/><text x="230" y="295" class="msg-text">6. forecast_response_v1</text>
+                    <path d="M220,340 L80,340" class="msg-return"/><text x="90" y="335" class="msg-text">7. Render Charts</text>
+                </svg>
+            </div>
+            <div class="info">
+                <table>
+                    <thead><tr><th>#</th><th>Step Description</th></tr></thead>
+                    <tbody>
+                        <tr><td class="step-num">1-2</td><td>Backend forwards historical price logs to the ML microservice.</td></tr>
+                        <tr><td class="step-num">3</td><td>Python logic performs scaling and adds "Hype" features.</td></tr>
+                        <tr><td class="step-num">4-5</td><td>Trained Prophet/Random Forest model generates 30 data points.</td></tr>
+                        <tr><td class="step-num">6-7</td><td>Aggregated results returned to UI to draw the "Future Trend" line.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. DETAILED AUTOMATED ALERTS -->
+    <div class="feature-card">
+        <h4>User Engagement</h4>
+        <h2>4. Automated Price Watcher & Alert Service</h2>
+        <div class="layout">
+            <div class="diagram">
+                <svg width="550" height="400" viewBox="0 0 550 400">
+                    <line x1="100" y1="40" x2="100" y2="350" class="lifeline"/>
+                    <line x1="250" y1="40" x2="250" y2="350" class="lifeline"/>
+                    <line x1="450" y1="40" x2="450" y2="350" class="lifeline"/>
+
+                    <rect x="50" y="10" width="100" height="30" class="actor-box"/><text x="100" y="30" class="actor-text">System Scheduler</text>
+                    <rect x="200" y="10" width="100" height="30" class="actor-box"/><text x="250" y="30" class="actor-text">Watchlist Logic</text>
+                    <rect x="400" y="10" width="100" height="30" class="actor-box"/><text x="450" y="30" class="actor-text">User Database</text>
+
+                    <rect x="245" y="80" width="10" height="230" class="execution"/>
+
+                    <path d="M100,80 L245,80" class="msg-arrow"/><text x="110" y="75" class="msg-text">1. triggerTask(6h_Interval)</text>
+                    <path d="M255,110 L450,110" class="msg-arrow"/><text x="280" y="105" class="msg-text">2. getAllWatchlists()</text>
+                    <path d="M450,140 L255,140" class="msg-return"/><text x="280" y="135" class="msg-text">3. Cursor[UserItems]</text>
+                    <path d="M255,180 L255,220 C285,220 285,180 255,180" class="msg-arrow"/><text x="260" y="205" class="msg-text">4. checkPriceDrop()</text>
+                    <path d="M245,260 L100,260" class="msg-return"/><text x="110" y="255" class="msg-text">5. triggerMailer(discount_list)</text>
+                    <circle cx="100" cy="310" r="10" fill="none" stroke="#000"/><circle cx="100" cy="310" r="5" fill="#000"/>
+                </svg>
+            </div>
+            <div class="info">
+                <table>
+                    <thead><tr><th>#</th><th>Step Description</th></tr></thead>
+                    <tbody>
+                        <tr><td class="step-num">1</td><td>A Node-Cron job wakes up every 6 hours.</td></tr>
+                        <tr><td class="step-num">2-3</td><td>Service pulls all sneaker SKUs that users are currently "watching."</td></tr>
+                        <tr><td class="step-num">4</td><td>Internal logic compares the "Last Fetch Price" with "User Threshold."</td></tr>
+                        <tr><td class="step-num">5</td><td>If a price drop > 10% is found, a notification batch is prepared.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. DETAILED ADMIN CLEANING -->
+    <div class="feature-card">
+        <h4>Data Integrity</h4>
+        <h2>5. Admin Master Data Sanitization</h2>
+        <div class="layout">
+            <div class="diagram">
+                <svg width="550" height="400" viewBox="0 0 550 400">
+                    <line x1="80" y1="40" x2="80" y2="350" class="lifeline"/>
+                    <line x1="220" y1="40" x2="220" y2="350" class="lifeline"/>
+                    <line x1="360" y1="40" x2="360" y2="350" class="lifeline"/>
+                    <line x1="480" y1="40" x2="480" y2="350" class="lifeline"/>
+
+                    <rect x="30" y="10" width="100" height="30" class="actor-box"/><text x="80" y="30" class="actor-text">Admin Portal</text>
+                    <rect x="170" y="10" width="100" height="30" class="actor-box"/><text x="220" y="30" class="actor-text">Node API</text>
+                    <rect x="310" y="10" width="100" height="30" class="actor-box"/><text x="360" y="30" class="actor-text">Pandas Worker</text>
+                    <rect x="430" y="10" width="100" height="30" class="actor-box"/><text x="480" y="30" class="actor-text">MongoDB</text>
+
+                    <rect x="355" y="110" width="10" height="170" class="execution"/>
+
+                    <path d="M80,80 L220,80" class="msg-arrow"/><text x="90" y="75" class="msg-text">1. POST /admin/sanitize</text>
+                    <path d="M220,110 L355,110" class="msg-arrow"/><text x="230" y="105" class="msg-text">2. spawn_child_process()</text>
+                    <path d="M365,140 L365,180 C395,180 395,140 365,140" class="msg-arrow"/><text x="375" y="165" class="msg-text">3. Z-Score Outlier Removal</text>
+                    <path d="M355,220 L480,220" class="msg-arrow"/><text x="375" y="215" class="msg-text">4. bulkWrite(Cleaned_Data)</text>
+                    <path d="M355,280 L220,280" class="msg-return"/><text x="230" y="275" class="msg-text">5. process_complete_ack</text>
+                </svg>
+            </div>
+            <div class="info">
+                <table>
+                    <thead><tr><th>#</th><th>Step Description</th></tr></thead>
+                    <tbody>
+                        <tr><td class="step-num">1-2</td><td>Admin triggers a bulk cleanup; Node.js spawns a Python worker.</td></tr>
+                        <tr><td class="step-num">3</td><td>Pandas library identifies and removes "Fake/Gifted" outlier prices.</td></tr>
+                        <tr><td class="step-num">4</td><td>Master database is updated with high-integrity price history logs.</td></tr>
+                        <tr><td class="step-num">5</td><td>Admin dashboard reflects the new "Market Confidence" score.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>
