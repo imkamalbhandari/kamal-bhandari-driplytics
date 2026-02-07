@@ -424,64 +424,65 @@ export const sneakerAPI = {
     const response = await api.post('/sneakers/predict-social', sneakerData);
     return response.data;
   },
+};
 
-  // ==================== 🔥 ENSEMBLE AI PREDICTION ====================
-
+// ==================== 💳 PAYMENT API (Khalti) ====================
+export const paymentAPI = {
   /**
-   * Get BEST PRICE prediction using ALL 7 AI models:
-   * - Random Forest, Gradient Boosting, Ridge/Linear Regression
-   * - Prophet Time Series
-   * - Sentiment Analysis (Reddit)
-   * - Google Trends
-   * - Groq LLM Market Analysis
-   * 
-   * @param {Object} sneakerData - Sneaker details
-   * @param {string} sneakerData.sneaker_name - Name of the sneaker
-   * @param {string} sneakerData.brand - Brand (e.g., "Yeezy", "Nike", "Off-White")
-   * @param {number} sneakerData.retail_price - Retail price
-   * @param {string} [sneakerData.release_date] - Release date (YYYY-MM-DD)
-   * @param {number} [sneakerData.shoe_size] - Shoe size (default: 10)
-   * @param {string} [sneakerData.region] - Region (default: "California")
-   * @param {boolean} [includeSentiment=true] - Include sentiment analysis
-   * @param {boolean} [includeTrends=true] - Include Google Trends
-   * @param {boolean} [includeGroq=true] - Include Groq LLM analysis
-   * @returns {Object} Prediction result with best price, confidence, and recommendation
+   * Get available subscription plans
    */
-  predictBestPrice: async (sneakerData, includeSentiment = true, includeTrends = true, includeGroq = true) => {
-    const response = await api.post('/sneakers/predict-best-price', {
-      ...sneakerData,
-      include_sentiment: includeSentiment,
-      include_trends: includeTrends,
-      include_groq: includeGroq
-    });
+  getPlans: async () => {
+    const response = await api.get('/payments/plans');
     return response.data;
   },
 
   /**
-   * Get QUICK price prediction using only ML models (faster, no real-time data)
-   * Good for batch operations or when speed is priority
+   * Get user's subscription status and remaining predictions
    */
-  predictBestPriceQuick: async (sneakerData) => {
-    const response = await api.post('/sneakers/predict-best-price/quick', sneakerData);
+  getStatus: async () => {
+    const response = await api.get('/payments/status');
     return response.data;
   },
 
   /**
-   * Get BATCH price predictions for multiple sneakers
-   * @param {Array} sneakers - Array of sneaker objects with sneaker_name, brand, retail_price
-   * @returns {Object} Batch prediction results
+   * Check if user can make a prediction (before prediction)
    */
-  predictBestPriceBatch: async (sneakers) => {
-    const response = await api.post('/sneakers/predict-best-price/batch', { sneakers });
+  checkPrediction: async () => {
+    const response = await api.post('/payments/check-prediction');
     return response.data;
   },
 
   /**
-   * Get information about all AI models in the ensemble
-   * Includes model types, weights, training metrics
+   * Record a prediction usage
    */
-  getModelsInfo: async () => {
-    const response = await api.get('/sneakers/models/info');
+  usePrediction: async () => {
+    const response = await api.post('/payments/use-prediction');
+    return response.data;
+  },
+
+  /**
+   * Initiate Khalti payment
+   * @param {string} planType - 'premium' or 'pro'
+   */
+  initiatePayment: async (planType) => {
+    const response = await api.post('/payments/initiate', { planType });
+    return response.data;
+  },
+
+  /**
+   * Verify Khalti payment after redirect
+   * @param {Object} paymentData - { pidx, txnId, amount, purchaseOrderId }
+   */
+  verifyPayment: async (paymentData) => {
+    const response = await api.post('/payments/verify', paymentData);
+    return response.data;
+  },
+
+  /**
+   * Get user's payment history
+   */
+  getHistory: async () => {
+    const response = await api.get('/payments/history');
     return response.data;
   },
 };

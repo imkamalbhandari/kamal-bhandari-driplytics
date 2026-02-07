@@ -5,6 +5,7 @@ Predicts sneaker prices based on:
 1. Social Media Presence (Reddit sentiment + Google Trends)
 2. Time Series Forecasting (Prophet)
 3. Linear Regression
+4. Real StockX Price Data
 
 Shows price changes with proper UP/DOWN percentage indicators.
 """
@@ -25,6 +26,70 @@ MODELS_DIR = os.path.join(os.path.dirname(__file__), 'models')
 DATASETS_DIR = os.path.join(os.path.dirname(__file__), 'datasets')
 
 
+def get_real_price_from_stockx(sneaker_name: str) -> Optional[Dict[str, Any]]:
+    """
+    Get real price data from StockX dataset.
+    Returns average sale price, retail price, and price change.
+    """
+    try:
+        stockx_path = os.path.join(DATASETS_DIR, 'stockx_complete.csv')
+        if not os.path.exists(stockx_path):
+            return None
+        
+        df = pd.read_csv(stockx_path)
+        
+        # Clean price columns
+        df['Sale_Price'] = df['Sale Price'].replace(r'[\$,]', '', regex=True).astype(float)
+        df['Retail_Price'] = df['Retail Price'].replace(r'[\$,]', '', regex=True).astype(float)
+        
+        # Search for sneaker (fuzzy match)
+        name_lower = sneaker_name.lower().replace('-', ' ').replace('_', ' ')
+        matches = df[df['Sneaker Name'].str.lower().str.replace('-', ' ').str.replace('_', ' ').str.contains(name_lower[:20], na=False)]
+        
+        if matches.empty:
+            # Try partial match with key words
+            keywords = name_lower.split()[:3]
+            for kw in keywords:
+                if len(kw) > 3:
+                    partial_matches = df[df['Sneaker Name'].str.lower().str.contains(kw, na=False)]
+                    if not partial_matches.empty:
+                        matches = partial_matches
+                        break
+        
+        if matches.empty:
+            return None
+        
+        # Aggregate stats
+        avg_sale_price = float(matches['Sale_Price'].mean())
+        min_price = float(matches['Sale_Price'].min())
+        max_price = float(matches['Sale_Price'].max())
+        retail_price = float(matches['Retail_Price'].iloc[0])
+        sale_count = int(len(matches))
+        brand = str(matches['Brand'].iloc[0])
+        
+        # Calculate price change from retail
+        price_change = avg_sale_price - retail_price
+        price_change_pct = (price_change / retail_price) * 100 if retail_price > 0 else 0
+        
+        return {
+            'found': True,
+            'sneaker_name': str(matches['Sneaker Name'].iloc[0]),
+            'brand': brand,
+            'current_price': round(avg_sale_price, 2),
+            'retail_price': round(retail_price, 2),
+            'min_price': round(min_price, 2),
+            'max_price': round(max_price, 2),
+            'sale_count': sale_count,
+            'price_change': round(price_change, 2),
+            'price_change_pct': round(price_change_pct, 2),
+            'is_above_retail': bool(avg_sale_price > retail_price)
+        }
+        
+    except Exception as e:
+        print(f"Error getting StockX price: {e}")
+        return None
+
+
 class SocialPricePredictor:
     """
     Price predictor based on social media presence and time series analysis.
@@ -42,17 +107,24 @@ class SocialPricePredictor:
         self.load_models()
         
     def load_models(self):
-        """Load Linear Regression model and encoders."""
+        """
+        Load ML models as specified in the proposal:
+        - Linear Regression
+        - Random Forest
+        - Prophet (Time Series) - loaded separately
+        """
         try:
-            # Load Linear Regression model
+            # Load Linear Regression model (from proposal)
             lr_path = os.path.join(MODELS_DIR, 'linear_regression_model.pkl')
             if os.path.exists(lr_path):
                 self.models['linear_regression'] = joblib.load(lr_path)
+                print("  ✓ Linear Regression model loaded")
             
-            # Try Ridge as fallback
-            ridge_path = os.path.join(MODELS_DIR, 'ridge_regression_model.pkl')
-            if os.path.exists(ridge_path):
-                self.models['ridge_regression'] = joblib.load(ridge_path)
+            # Load Random Forest model (from proposal)
+            rf_path = os.path.join(MODELS_DIR, 'random_forest_model.pkl')
+            if os.path.exists(rf_path):
+                self.models['random_forest'] = joblib.load(rf_path)
+                print("  ✓ Random Forest model loaded")
             
             # Load encoders
             self.encoders['brand'] = joblib.load(os.path.join(MODELS_DIR, 'brand_encoder.pkl'))
@@ -63,7 +135,7 @@ class SocialPricePredictor:
             self.metadata = joblib.load(os.path.join(MODELS_DIR, 'training_metadata.pkl'))
             
             self.loaded = True
-            print("✅ Social Price Predictor: Models loaded successfully")
+            print("✅ Social Price Predictor: Models loaded (Linear Regression, Random Forest, Prophet)")
             
         except Exception as e:
             print(f"❌ Error loading models: {e}")
@@ -118,27 +190,47 @@ class SocialPricePredictor:
         
         return features
     
-    def get_linear_regression_prediction(self, features: np.ndarray, retail_price: float) -> Dict[str, Any]:
-        """Get prediction from Linear Regression model."""
+    def get_random_forest_prediction(self, features: np.ndarray, current_price: float) -> Dict[str, Any]:
+        """Get prediction from Random Forest model (from proposal)."""
         try:
-            # Scale features
-            scaled_features = self.scaler.transform(features)
+            if 'random_forest' not in self.models:
+                return None
             
-            # Use ridge or linear regression
-            if 'ridge_regression' in self.models:
-                prediction = self.models['ridge_regression'].predict(scaled_features)[0]
-                model_name = 'Ridge Regression'
-            elif 'linear_regression' in self.models:
-                prediction = self.models['linear_regression'].predict(scaled_features)[0]
+            # Random Forest doesn't need scaled features (tree-based model)
+            prediction = self.models['random_forest'].predict(features)[0]
+            
+            # Ensure reasonable prediction (cap at 2x current price for sanity)
+            if prediction <= 0:
+                prediction = current_price * 1.10
+            elif prediction > current_price * 2:
+                # Scale down unrealistic predictions
+                prediction = current_price * (1 + min((prediction / current_price - 1) * 0.3, 0.5))
+            
+            return {
+                'predicted_price': float(prediction),
+                'model': 'Random Forest',
+                'confidence': 0.80
+            }
+            
+        except Exception as e:
+            print(f"Random Forest error: {e}")
+            return None
+    
+    def get_linear_regression_prediction(self, features: np.ndarray, current_price: float) -> Dict[str, Any]:
+        """Get prediction from Linear Regression model (from proposal)."""
+        try:
+            # Use linear regression with raw features (consistent with training)
+            if 'linear_regression' in self.models:
+                prediction = self.models['linear_regression'].predict(features)[0]
                 model_name = 'Linear Regression'
             else:
                 # Fallback to simple estimate
-                prediction = retail_price * 1.15
+                prediction = current_price * 1.10
                 model_name = 'Estimated'
             
             # Ensure reasonable prediction
-            if prediction <= 0 or prediction > retail_price * 5:
-                prediction = retail_price * 1.15
+            if prediction <= 0 or prediction > current_price * 5:
+                prediction = current_price * 1.10
             
             return {
                 'predicted_price': float(prediction),
@@ -149,7 +241,7 @@ class SocialPricePredictor:
         except Exception as e:
             print(f"Linear regression error: {e}")
             return {
-                'predicted_price': retail_price * 1.15,
+                'predicted_price': current_price * 1.10,
                 'model': 'Fallback',
                 'confidence': 0.5
             }
@@ -318,34 +410,50 @@ class SocialPricePredictor:
         return social_data
     
     def calculate_final_prediction(self, 
+                                    random_forest_pred: Optional[Dict],
                                     linear_pred: Dict,
                                     time_series: Optional[Dict],
                                     social_data: Dict,
-                                    retail_price: float) -> Dict[str, Any]:
+                                    current_price: float) -> Dict[str, Any]:
         """
-        Calculate final price prediction combining all sources.
-        Weights: Time Series (50%), Linear Regression (30%), Social Adjustment (20%)
+        Calculate final price prediction using algorithms from proposal:
+        - Random Forest (40% weight)
+        - Linear Regression (30% weight)  
+        - Prophet/Time Series (30% weight)
+        
+        Social media data adjusts the final prediction.
         """
         
         predictions = []
         weights = []
+        models_used = []
         
-        # Time Series prediction (highest priority if available)
-        if time_series and time_series.get('predicted_price_30d'):
-            ts_price = time_series['predicted_price_30d']
-            ts_confidence = time_series.get('confidence', 0.8)
-            predictions.append(ts_price)
-            weights.append(0.50 * ts_confidence)
+        # Random Forest prediction (from proposal) - highest weight
+        if random_forest_pred and random_forest_pred.get('predicted_price'):
+            rf_price = random_forest_pred['predicted_price']
+            rf_confidence = random_forest_pred.get('confidence', 0.80)
+            predictions.append(rf_price)
+            weights.append(0.40 * rf_confidence)
+            models_used.append('Random Forest')
         
-        # Linear Regression prediction
+        # Linear Regression prediction (from proposal)
         lr_price = linear_pred['predicted_price']
         lr_confidence = linear_pred.get('confidence', 0.75)
         predictions.append(lr_price)
         weights.append(0.30 * lr_confidence)
+        models_used.append('Linear Regression')
         
-        # If no time series, give more weight to linear regression
-        if not time_series:
-            weights[-1] = 0.70 * lr_confidence
+        # Prophet/Time Series prediction (from proposal)
+        if time_series and time_series.get('predicted_price_30d'):
+            ts_price = time_series['predicted_price_30d']
+            ts_confidence = time_series.get('confidence', 0.8)
+            predictions.append(ts_price)
+            weights.append(0.30 * ts_confidence)
+            models_used.append('Prophet (Time Series)')
+        
+        # If no Random Forest or Time Series, give more weight to linear regression
+        if len(predictions) == 1:
+            weights[0] = 1.0
         
         # Calculate weighted average
         if sum(weights) > 0:
@@ -357,15 +465,17 @@ class SocialPricePredictor:
         social_adjustment = social_data.get('price_adjustment', 1.0)
         final_prediction = base_prediction * social_adjustment
         
-        # Calculate price change
-        price_change = final_prediction - retail_price
-        price_change_percent = (price_change / retail_price) * 100 if retail_price > 0 else 0
+        # Calculate price change from current market price
+        price_change = final_prediction - current_price
+        price_change_percent = (price_change / current_price) * 100 if current_price > 0 else 0
         
-        # Calculate confidence
+        # Calculate confidence based on models and data
         data_points = time_series.get('historical_data_points', 0) if time_series else 0
         reddit_posts = social_data.get('reddit', {}).get('posts_found', 0) if social_data.get('reddit') else 0
         
         confidence = 0.70
+        if random_forest_pred:
+            confidence += 0.05
         if data_points > 50:
             confidence += 0.10
         if reddit_posts > 10:
@@ -379,17 +489,18 @@ class SocialPricePredictor:
         std_dev = abs(final_prediction - base_prediction) + (final_prediction * 0.05)
         
         return {
-            'predicted_price': round(final_prediction, 2),
-            'price_change': round(price_change, 2),
-            'price_change_percent': round(price_change_percent, 2),
-            'is_increase': price_change >= 0,
+            'predicted_price': round(float(final_prediction), 2),
+            'price_change': round(float(price_change), 2),
+            'price_change_percent': round(float(price_change_percent), 2),
+            'is_increase': bool(price_change >= 0),
             'price_range': {
-                'low': round(final_prediction - std_dev, 2),
-                'mid': round(final_prediction, 2),
-                'high': round(final_prediction + std_dev, 2)
+                'low': round(float(final_prediction - std_dev), 2),
+                'mid': round(float(final_prediction), 2),
+                'high': round(float(final_prediction + std_dev), 2)
             },
-            'confidence': round(confidence, 2),
-            'social_adjustment': round((social_adjustment - 1) * 100, 2)
+            'confidence': round(float(confidence), 2),
+            'social_adjustment': round(float((social_adjustment - 1) * 100), 2),
+            'models_used': models_used
         }
     
     def get_recommendation(self, price_change_percent: float, is_increase: bool, confidence: float) -> Dict[str, Any]:
@@ -434,9 +545,10 @@ class SocialPricePredictor:
         Main prediction method.
         
         Uses:
-        1. Social Media Presence (Reddit + Google Trends)
-        2. Time Series Forecasting (Prophet)
-        3. Linear Regression
+        1. Real StockX Price Data (current market price)
+        2. Social Media Presence (Reddit + Google Trends)
+        3. Time Series Forecasting (Prophet)
+        4. Linear Regression
         
         Returns prediction with proper UP/DOWN percentage display.
         """
@@ -452,22 +564,46 @@ class SocialPricePredictor:
             retail_price = float(data.get('retail_price', 220))
             brand = data.get('brand', 'Unknown')
             
+            # Get REAL current price from StockX data
+            stockx_data = get_real_price_from_stockx(sneaker_name)
+            
+            # Use real current price if available, otherwise use retail as base
+            if stockx_data and stockx_data.get('current_price'):
+                current_market_price = stockx_data['current_price']
+                real_retail_price = stockx_data['retail_price']
+                brand = stockx_data.get('brand', brand)
+                has_real_data = True
+            else:
+                current_market_price = retail_price
+                real_retail_price = retail_price
+                has_real_data = False
+            
             # Prepare features
             features = self.prepare_features(data)
             
-            # Get Linear Regression prediction
-            linear_pred = self.get_linear_regression_prediction(features, retail_price)
+            # Get Random Forest prediction (from proposal)
+            random_forest_pred = self.get_random_forest_prediction(features, current_market_price)
             
-            # Get Time Series forecast
-            time_series = self.get_time_series_forecast(sneaker_name, retail_price)
+            # Get Linear Regression prediction (from proposal)
+            linear_pred = self.get_linear_regression_prediction(features, current_market_price)
             
-            # Get Social Media data
+            # Get Prophet/Time Series forecast (from proposal)
+            time_series = self.get_time_series_forecast(sneaker_name, current_market_price)
+            
+            # Get Social Media data (Reddit + Google Trends)
             social_data = self.get_social_media_data(sneaker_name)
             
-            # Calculate final prediction
+            # Calculate final FUTURE prediction using all models from proposal
             prediction = self.calculate_final_prediction(
-                linear_pred, time_series, social_data, retail_price
+                random_forest_pred, linear_pred, time_series, social_data, current_market_price
             )
+            
+            # Add real market data to prediction
+            prediction['current_market_price'] = current_market_price
+            prediction['retail_price'] = real_retail_price
+            prediction['has_real_data'] = has_real_data
+            if stockx_data:
+                prediction['stockx_data'] = stockx_data
             
             # Get recommendation
             recommendation = self.get_recommendation(
@@ -476,21 +612,39 @@ class SocialPricePredictor:
                 prediction['confidence']
             )
             
-            # Build response
+            # Build response - SIMPLIFIED for user-friendly display
             processing_time = (datetime.now() - start_time).total_seconds()
+            
+            # Create user-friendly factors list
+            factors_considered = []
+            if has_real_data:
+                factors_considered.append("Historical sales data from StockX")
+            if social_data.get('reddit') and social_data['reddit'].get('posts_found', 0) > 0:
+                factors_considered.append(f"Social media buzz ({social_data['reddit']['posts_found']} Reddit discussions)")
+            if social_data.get('google_trends'):
+                trend_dir = social_data['google_trends'].get('trend_direction', 'stable')
+                factors_considered.append(f"Market interest trends ({trend_dir})")
+            if time_series and time_series.get('historical_data_points', 0) > 0:
+                factors_considered.append(f"Price patterns ({time_series['historical_data_points']} data points)")
+            factors_considered.append("Seasonal demand patterns")
+            factors_considered.append("Brand value analysis")
             
             return {
                 'success': True,
                 'input': {
                     'sneaker_name': sneaker_name,
                     'brand': brand,
-                    'retail_price': retail_price,
+                    'retail_price': real_retail_price,
+                    'current_market_price': current_market_price,
+                    'has_real_data': has_real_data,
                     'release_date': data.get('release_date', ''),
                     'shoe_size': data.get('shoe_size', 10),
                     'region': data.get('region', 'California')
                 },
                 'prediction': {
                     'predicted_price': prediction['predicted_price'],
+                    'current_price': current_market_price,
+                    'retail_price': real_retail_price,
                     'price_change': prediction['price_change'],
                     'price_change_percent': prediction['price_change_percent'],
                     'is_increase': prediction['is_increase'],
@@ -499,11 +653,22 @@ class SocialPricePredictor:
                     'trend_color': recommendation['trend_color'],
                     'price_range': prediction['price_range'],
                     'confidence': prediction['confidence'],
-                    'social_impact': f"{'+' if prediction['social_adjustment'] >= 0 else ''}{prediction['social_adjustment']}%"
+                    'social_impact': f"{'+' if prediction['social_adjustment'] >= 0 else ''}{prediction['social_adjustment']}%",
+                    'stockx_data': stockx_data if stockx_data else None,
+                    # User-friendly factors instead of algorithm names
+                    'factors_considered': factors_considered,
+                    # Simplified forecast
+                    'forecast': {
+                        '7_days': time_series.get('predicted_price_7d') if time_series else None,
+                        '14_days': time_series.get('predicted_price_14d') if time_series else None,
+                        '30_days': time_series.get('predicted_price_30d') if time_series else None,
+                        'price_range_low': time_series.get('lower_bound') if time_series else prediction['price_range']['low'],
+                        'price_range_high': time_series.get('upper_bound') if time_series else prediction['price_range']['high']
+                    }
                 },
+                # Keep models for internal use but simplified
                 'models': {
                     'time_series': {
-                        'model': time_series.get('model', 'N/A') if time_series else 'N/A',
                         'price_7d': time_series.get('predicted_price_7d') if time_series else None,
                         'price_14d': time_series.get('predicted_price_14d') if time_series else None,
                         'price_30d': time_series.get('predicted_price_30d') if time_series else None,
@@ -513,7 +678,6 @@ class SocialPricePredictor:
                         'confidence': time_series.get('confidence', 0) if time_series else 0
                     },
                     'linear_regression': {
-                        'model': linear_pred['model'],
                         'predicted_price': round(linear_pred['predicted_price'], 2),
                         'confidence': linear_pred['confidence']
                     }
@@ -528,7 +692,7 @@ class SocialPricePredictor:
                 'metadata': {
                     'processing_time': round(processing_time, 3),
                     'prediction_date': datetime.now().isoformat(),
-                    'models_used': ['Time Series Forecasting', 'Linear Regression', 'Social Media Analysis']
+                    'data_source': 'StockX + Social Media + Market Trends' if has_real_data else 'AI Analysis'
                 }
             }
             

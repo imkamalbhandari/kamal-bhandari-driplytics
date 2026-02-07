@@ -345,36 +345,50 @@ def get_market_price_comparison(sneaker_names: list) -> dict:
     
     comparisons = []
     for name in sneaker_names[:5]:  # Limit to 5 sneakers
-        sneaker_df = df[df['Sneaker Name'].str.lower().str.contains(name.lower(), na=False)]
+        # Fuzzy match on sneaker name
+        name_clean = name.lower().replace('-', ' ').replace('_', ' ')
+        sneaker_df = df[df['Sneaker Name'].str.lower().str.replace('-', ' ').str.replace('_', ' ').str.contains(name_clean[:15], na=False)]
+        
+        if len(sneaker_df) == 0:
+            # Try partial match with keywords
+            keywords = name_clean.split()[:2]
+            for kw in keywords:
+                if len(kw) > 3:
+                    partial = df[df['Sneaker Name'].str.lower().str.contains(kw, na=False)]
+                    if len(partial) > 0:
+                        sneaker_df = partial
+                        break
         
         if len(sneaker_df) > 0:
             # Get sneaker info
             sneaker_info = sneaker_df.iloc[0]
             
-            # Aggregate by week for cleaner comparison
-            price_history = sneaker_df.groupby(pd.Grouper(key='Order_Date', freq='W')).agg({
-                'Sale_Price': 'mean'
-            }).reset_index()
-            price_history = price_history.dropna()
+            # Calculate aggregate stats directly (simpler approach)
+            avg_price = float(sneaker_df['Sale_Price'].mean())
+            min_price = float(sneaker_df['Sale_Price'].min())
+            max_price = float(sneaker_df['Sale_Price'].max())
+            retail_price = float(sneaker_info['Retail_Price'])
             
-            if len(price_history) > 0:
-                first_price = price_history['Sale_Price'].iloc[0]
-                current_price = price_history['Sale_Price'].iloc[-1]
-                change_pct = ((current_price - first_price) / first_price) * 100 if first_price > 0 else 0
-                
-                comparisons.append({
-                    'name': sneaker_info['Sneaker Name'],
-                    'brand': sneaker_info['Brand'],
-                    'dates': price_history['Order_Date'].dt.strftime('%Y-%m-%d').tolist(),
-                    'prices': price_history['Sale_Price'].round(2).tolist(),
-                    'current_price': round(current_price, 2),
-                    'retail_price': float(sneaker_info['Retail_Price']),
-                    'change_percent': round(change_pct, 1),
-                    'total_sales': len(sneaker_df)
-                })
+            # Price change from retail
+            change_pct = ((avg_price - retail_price) / retail_price) * 100 if retail_price > 0 else 0
+            
+            comparisons.append({
+                'sneaker': str(sneaker_info['Sneaker Name']),
+                'name': str(sneaker_info['Sneaker Name']).replace('-', ' '),
+                'brand': str(sneaker_info['Brand']),
+                'avg_price': round(avg_price, 2),
+                'min_price': round(min_price, 2),
+                'max_price': round(max_price, 2),
+                'current_price': round(avg_price, 2),
+                'retail_price': round(retail_price, 2),
+                'change_percent': round(change_pct, 1),
+                'total_sales': int(len(sneaker_df)),
+                'premium': round(avg_price - retail_price, 2)
+            })
     
     return {
         'success': True,
+        'comparison': comparisons,  # For compatibility with frontend
         'comparisons': comparisons,
         'count': len(comparisons)
     }

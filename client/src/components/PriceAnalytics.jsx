@@ -26,7 +26,7 @@ ChartJS.register(
   Filler
 );
 
-function PriceAnalytics({ sneakerName, retailPrice }) {
+function PriceAnalytics({ sneakerName }) {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

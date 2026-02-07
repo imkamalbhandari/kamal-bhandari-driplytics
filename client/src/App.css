@@ -1,25 +1,9 @@
-/* Global resets */
-*, *::before, *::after {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* App-specific styles - base styles are in index.css */
 
-html, body {
-  width: 100%;
-  min-height: 100vh;
-}
-
-#root {
-  width: 100%;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Ensure main content takes full width and centers properly */
+/* Ensure main content takes full width */
 main {
   width: 100%;
+  flex: 1;
 }
 
 /* Content container styling for proper centering */
@@ -44,24 +28,6 @@ main {
     padding-left: 2rem;
     padding-right: 2rem;
   }
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #1f2937;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #4b5563;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
 }
 
 

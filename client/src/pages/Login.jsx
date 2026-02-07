@@ -279,38 +279,50 @@ function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black px-4 py-12 relative overflow-hidden">
-      {/* Sneaker-themed background elements */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute top-20 left-10 w-64 h-64 bg-white rounded-full blur-3xl"></div>
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-indigo-500 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-purple-500 rounded-full blur-3xl"></div>
+      {/* Animated background elements */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-20 left-10 w-72 h-72 bg-white/5 rounded-full blur-3xl animate-float-slow"></div>
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl animate-float-delayed animate-glow-pulse"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl animate-float"></div>
       </div>
 
-      <div className="max-w-md w-full relative z-10">
+      {/* Subtle grid pattern overlay */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.02]" style={{ 
+        backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+        backgroundSize: '60px 60px'
+      }}></div>
+
+      <div className="max-w-md w-full relative z-10 animate-scale-in">
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold text-white mb-2 tracking-tight">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl mb-4 shadow-xl shadow-indigo-500/30 animate-float">
+            <span className="text-white font-bold text-2xl">D</span>
+          </div>
+          <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">
             Driplytics
           </h1>
           <p className="text-gray-400 text-sm">Sneaker Analytics & Predictions</p>
         </div>
 
         {/* Login Form Card */}
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-gray-200/50">
+        <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-8 border border-gray-200/50 shadow-indigo-500/5">
           <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">
             Welcome Back
           </h2>
           
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r text-sm animate-fade-in">
+            <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-lg text-sm animate-fade-in flex items-center gap-2">
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
               <p className="font-medium">{error}</p>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email Field */}
-            <div>
+            <div className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
               <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
                 Email Address
               </label>
@@ -321,25 +333,30 @@ function Login() {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all ${
-                  emailError ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'
+                className={`w-full px-4 py-3.5 border-2 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all ${
+                  emailError ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'
                 }`}
                 placeholder="you@example.com"
               />
               {emailError && (
-                <p className="mt-1 text-sm text-red-600 animate-fade-in">{emailError}</p>
+                <p className="mt-2 text-sm text-red-600 animate-fade-in flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {emailError}
+                </p>
               )}
             </div>
 
             {/* Password Field */}
-            <div>
+            <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
               <div className="flex justify-between items-center mb-2">
                 <label htmlFor="password" className="block text-sm font-semibold text-gray-700">
                   Password
                 </label>
                 <Link 
                   to="/forgot-password" 
-                  className="text-sm text-indigo-600 hover:text-indigo-800 font-semibold transition-colors"
+                  className="text-sm text-indigo-600 hover:text-indigo-800 font-semibold transition-colors hover:underline"
                 >
                   Forgot password?
                 </Link>
@@ -352,13 +369,13 @@ function Login() {
                   value={formData.password}
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white pr-12"
+                  className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all bg-white pr-12 hover:border-gray-300"
                   placeholder="Enter your password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none transition-colors"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? (
@@ -379,11 +396,12 @@ function Login() {
             <button
               type="submit"
               disabled={!isFormValid()}
-              className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-all duration-200 ${
+              className={`w-full py-3.5 px-4 rounded-xl font-semibold text-white transition-all duration-300 animate-fade-in ${
                 isFormValid()
-                  ? 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 transform hover:-translate-y-0.5 hover:scale-[1.02]'
                   : 'bg-gray-400 cursor-not-allowed'
               }`}
+              style={{ animationDelay: '0.3s' }}
             >
               {loading ? (
                 <span className="flex items-center justify-center">
@@ -400,12 +418,12 @@ function Login() {
           </form>
 
           {/* Divider */}
-          <div className="relative my-6">
+          <div className="relative my-8">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
+              <div className="w-full border-t border-gray-200"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">Or continue with</span>
+              <span className="px-4 bg-white text-gray-500 rounded-full">Or continue with</span>
             </div>
           </div>
 
@@ -424,16 +442,19 @@ function Login() {
           </button> */}
 
           {/* Sign Up Link */}
-          <p className="mt-6 text-center text-sm text-gray-600">
+          <p className="mt-8 text-center text-sm text-gray-600">
             Don't have an account?{' '}
-            <Link to="/signup" className="text-indigo-600 hover:text-indigo-800 font-semibold transition-colors">
+            <Link to="/signup" className="text-indigo-600 hover:text-indigo-800 font-semibold transition-colors hover:underline">
               Sign up
             </Link>
           </p>
         </div>
 
         {/* Footer */}
-        <p className="mt-6 text-center text-xs text-gray-400">
+        <p className="mt-8 text-center text-xs text-gray-500 flex items-center justify-center gap-2">
+          <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
           Secure login powered by JWT authentication
         </p>
       </div>

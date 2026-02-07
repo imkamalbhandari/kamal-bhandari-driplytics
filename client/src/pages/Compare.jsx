@@ -1,12 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Layout from '../components/layout/Layout';
 import { sneakerAPI } from '../services/api';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  PointElement,
-  LineElement,
   BarElement,
   Title,
   Tooltip,
@@ -17,8 +15,6 @@ import { Bar } from 'react-chartjs-2';
 ChartJS.register(
   CategoryScale,
   LinearScale,
-  PointElement,
-  LineElement,
   BarElement,
   Title,
   Tooltip,
@@ -158,21 +154,20 @@ function Compare() {
 
   return (
     <Layout requireAuth>
-      <div className="flex-1 w-full">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">Compare Sneakers</h1>
-            <p className="text-gray-400">Compare prices and predictions across multiple sneakers</p>
-          </div>
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-white mb-2">Compare Sneakers</h1>
+          <p className="text-gray-400">Compare prices and predictions across multiple sneakers</p>
+        </div>
 
-          {/* Search */}
-          <div className="mb-6">
-            <div className="flex gap-3">
-              <div className="flex-1 relative">
-                <input
-                  type="text"
-                  value={searchQuery}
+        {/* Search */}
+        <div className="mb-6">
+          <div className="flex gap-3">
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                   placeholder="Search sneakers to compare..."
@@ -370,7 +365,6 @@ function Compare() {
               </p>
             </div>
           )}
-        </div>
       </div>
     </Layout>
   );

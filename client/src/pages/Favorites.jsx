@@ -8,7 +8,6 @@ function Favorites() {
   const [sortBy, setSortBy] = useState('recent');
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchFavorites();
@@ -23,7 +22,6 @@ function Favorites() {
       }
     } catch (err) {
       console.error('Error fetching favorites:', err);
-      setError('Failed to load favorites');
     } finally {
       setLoading(false);
     }
@@ -72,8 +70,7 @@ function Favorites() {
 
   return (
     <Layout requireAuth>
-      <div className="flex-1 w-full">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
@@ -159,7 +156,8 @@ function Favorites() {
                     releaseDate: sneaker.releaseDate,
                     retailPrice: sneaker.retailPrice,
                     gender: sneaker.gender,
-                    volatility: sneaker.volatility
+                    volatility: sneaker.volatility,
+                    image: sneaker.image || null
                   }}}
                   className="group bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden hover:border-indigo-500/50 transition-all"
                 >
@@ -174,7 +172,15 @@ function Favorites() {
                       </svg>
                     </button>
                     <div className="w-full h-full flex items-center justify-center">
-                      <div className="w-24 h-24 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-full flex items-center justify-center">
+                      {sneaker.image ? (
+                        <img 
+                          src={sneaker.image} 
+                          alt={sneaker.name}
+                          className="w-full h-full object-contain"
+                          onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                        />
+                      ) : null}
+                      <div className={`w-24 h-24 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-full flex items-center justify-center ${sneaker.image ? 'hidden' : ''}`}>
                         <svg className="w-12 h-12 text-indigo-400/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
@@ -228,17 +234,26 @@ function Favorites() {
                     releaseDate: sneaker.releaseDate,
                     retailPrice: sneaker.retailPrice,
                     gender: sneaker.gender,
-                    volatility: sneaker.volatility
+                    volatility: sneaker.volatility,
+                    image: sneaker.image || null
                   }}}
                   className="flex items-center gap-6 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-4 hover:border-indigo-500/50 transition-all"
                 >
                   {/* Image */}
-                  <div className="w-20 h-20 bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <div className="w-12 h-12 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-full flex items-center justify-center">
-                      <svg className="w-6 h-6 text-indigo-400/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
+                  <div className="w-20 h-20 bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {sneaker.image ? (
+                      <img 
+                        src={sneaker.image} 
+                        alt={sneaker.name}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-full flex items-center justify-center">
+                        <svg className="w-6 h-6 text-indigo-400/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                    )}
                   </div>
 
                   {/* Content */}
@@ -296,7 +311,6 @@ function Favorites() {
             </Link>
           </div>
         )}
-        </div>
       </div>
     </Layout>
   );

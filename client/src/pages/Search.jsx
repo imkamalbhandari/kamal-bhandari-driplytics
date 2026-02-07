@@ -51,19 +51,19 @@ function Search() {
           ];
           setBrands(brandOptions);
         }
-      } catch (err) {
-        console.log('Using default brands');
+      } catch {
+        // Using default brands
       }
     };
     fetchBrands();
   }, []);
 
-  // Search sneakers
+  // Search sneakers - triggered by button click or Enter key
   const searchSneakers = useCallback(async () => {
+    // Allow search with just brand OR just query
     if (!searchQuery.trim() && selectedBrand === 'all') {
       setSneakers([]);
-      setAiSummary(null);
-      setAiParsed(null);
+      setError(null);
       return;
     }
     
@@ -104,8 +104,8 @@ function Search() {
               allResults = [...allResults, ...aiResults];
             }
           }
-        } catch (aiErr) {
-          console.log('AI search failed, falling back to standard search:', aiErr.message);
+        } catch {
+          // AI search failed, falling back to standard search
         }
       }
       
@@ -141,8 +141,8 @@ function Search() {
             }));
             allResults = [...allResults, ...datasetResults];
           }
-        } catch (datasetErr) {
-          console.log('Dataset search failed:', datasetErr.message);
+        } catch {
+          // Dataset search failed
         }
       }
       
@@ -152,7 +152,7 @@ function Search() {
       if (searchQuery.trim() && allResults.length > 0) {
         try {
           await authAPI.addSearchHistory(searchQuery, allResults.length);
-        } catch (e) {
+        } catch {
           // Silently fail - user might not be logged in
         }
       }
@@ -168,19 +168,22 @@ function Search() {
     }
   }, [searchQuery, selectedBrand, aiSearchEnabled]);
 
-  // Debounced search
+  // Load initial results when brand is selected
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (mlServiceStatus === 'connected') {
-        searchSneakers();
-      }
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, [searchQuery, selectedBrand, mlServiceStatus, searchSneakers]);
+    if (selectedBrand !== 'all' && mlServiceStatus === 'connected') {
+      searchSneakers();
+    }
+  }, [selectedBrand]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Filter and sort sneakers
   const filteredSneakers = sneakers.filter((sneaker) => {
+    // Brand filter (already applied in search, but double-check)
+    let matchesBrand = true;
+    if (selectedBrand !== 'all') {
+      matchesBrand = sneaker.brand?.toLowerCase() === selectedBrand.toLowerCase();
+    }
+    
+    // Price filter
     let matchesPrice = true;
     const price = sneaker.resalePrice || sneaker.retailPrice;
     if (priceRange === '0-100') matchesPrice = price < 100;
@@ -188,18 +191,21 @@ function Search() {
     else if (priceRange === '200-500') matchesPrice = price >= 200 && price < 500;
     else if (priceRange === '500+') matchesPrice = price >= 500;
     
-    return matchesPrice;
+    return matchesBrand && matchesPrice;
   }).sort((a, b) => {
     if (sortBy === 'price-low') return (a.resalePrice || a.retailPrice) - (b.resalePrice || b.retailPrice);
     if (sortBy === 'price-high') return (b.resalePrice || b.retailPrice) - (a.resalePrice || a.retailPrice);
     if (sortBy === 'newest') return new Date(b.releaseDate) - new Date(a.releaseDate);
-    return 0; // popular - keep original order
+    if (sortBy === 'popular') {
+      // Sort by sale count or hype score if available
+      return (b.saleCount || 0) - (a.saleCount || 0);
+    }
+    return 0;
   });
 
   return (
     <Layout requireAuth>
-      <div className="flex-1 w-full">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Search Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
@@ -234,26 +240,46 @@ function Search() {
 
         {/* Search Bar */}
         <div className="relative mb-4">
-          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            {aiSearchEnabled ? (
-              <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            )}
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                {aiSearchEnabled ? (
+                  <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                )}
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && searchSneakers()}
+                placeholder={aiSearchEnabled ? "Try: 'Jordans under $200' or 'trending Nike dunks'" : "Search by name, brand, or colorway..."}
+                className={`w-full pl-12 pr-4 py-4 bg-white/5 border rounded-2xl text-white placeholder-gray-400 focus:ring-2 focus:border-transparent outline-none transition-all ${
+                  aiSearchEnabled ? 'border-purple-500/30 focus:ring-purple-500' : 'border-white/10 focus:ring-indigo-500'
+                }`}
+              />
+            </div>
+            {/* Search Button */}
+            <button
+              onClick={searchSneakers}
+              disabled={loading || mlServiceStatus !== 'connected'}
+              className="px-6 py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-2xl transition-all flex items-center gap-2"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              )}
+              Search
+            </button>
           </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={aiSearchEnabled ? "Try: 'Jordans under $200' or 'trending Nike dunks'" : "Search by name, brand, or colorway..."}
-            className={`w-full pl-12 pr-4 py-4 bg-white/5 border rounded-2xl text-white placeholder-gray-400 focus:ring-2 focus:border-transparent outline-none transition-all ${
-              aiSearchEnabled ? 'border-purple-500/30 focus:ring-purple-500' : 'border-white/10 focus:ring-indigo-500'
-            }`}
-          />
         </div>
 
         {/* AI Search Toggle */}
@@ -360,12 +386,47 @@ function Search() {
               </svg>
             </button>
           </div>
+
+          {/* Clear Filters */}
+          {(selectedBrand !== 'all' || priceRange !== 'all' || searchQuery) && (
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setSelectedBrand('all');
+                setPriceRange('all');
+                setSortBy('popular');
+                setSneakers([]);
+                setError(null);
+              }}
+              className="px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl hover:bg-red-500/30 transition-all flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Clear
+            </button>
+          )}
         </div>
 
-        {/* Results Count */}
-        <p className="text-gray-400 text-sm mb-6">
-          {loading ? 'Searching...' : `Showing ${filteredSneakers.length} results`}
-        </p>
+        {/* Results Count & Info */}
+        <div className="flex items-center justify-between mb-6">
+          <p className="text-gray-400 text-sm">
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+                Searching...
+              </span>
+            ) : sneakers.length > 0 ? (
+              <>
+                Showing <span className="text-white font-medium">{filteredSneakers.length}</span> of {sneakers.length} results
+                {selectedBrand !== 'all' && <span className="text-indigo-400"> • {brands.find(b => b.id === selectedBrand)?.name}</span>}
+                {priceRange !== 'all' && <span className="text-green-400"> • {priceRanges.find(p => p.id === priceRange)?.name}</span>}
+              </>
+            ) : (
+              'Enter a search term or select a brand to find sneakers'
+            )}
+          </p>
+        </div>
 
         {/* Error State */}
         {error && (
@@ -628,7 +689,6 @@ function Search() {
             <p className="text-gray-400">Try adjusting your search or filters</p>
           </div>
         )}
-        </div>
       </div>
     </Layout>
   );

@@ -4,7 +4,6 @@ const axios = require('axios');
 
 // ML Service URL - runs on port 5002
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5002';
-console.log('ML Service URL configured as:', ML_SERVICE_URL);
 
 /**
  * Search sneakers

@@ -277,8 +277,7 @@ function Profile() {
 
   return (
     <Layout requireAuth>
-      <div className="flex-1 w-full">
-        <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Profile Header */}
         <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6 mb-8">
           <div className="flex flex-col sm:flex-row items-center gap-6">
@@ -685,7 +684,6 @@ function Profile() {
             </div>
           </div>
         )}
-        </div>
       </div>
     </Layout>
   );

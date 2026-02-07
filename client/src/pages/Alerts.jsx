@@ -37,8 +37,8 @@ function Alerts() {
         if (response.success) {
           setTrendingNow(response.data);
         }
-      } catch (error) {
-        console.log('Trending not available');
+      } catch {
+        // Trending not available
       }
     };
 
@@ -48,8 +48,8 @@ function Alerts() {
         if (response.success && response.data?.posts) {
           setRedditHot(response.data.posts.slice(0, 5));
         }
-      } catch (error) {
-        console.log('Reddit not available');
+      } catch {
+        // Reddit not available
       }
     };
 
@@ -108,30 +108,20 @@ function Alerts() {
     saveAlerts(alerts.filter(a => a.id !== alertId));
   };
 
-  // Toggle alert type
-  const toggleAlertType = (alertId) => {
-    saveAlerts(alerts.map(a => 
-      a.id === alertId 
-        ? { ...a, alertType: a.alertType === 'below' ? 'above' : 'below' }
-        : a
-    ));
-  };
-
   return (
     <Layout requireAuth>
-      <div className="flex-1 w-full">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">Price Alerts</h1>
-            <p className="text-gray-400">Get notified when sneaker prices hit your target</p>
-          </div>
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-white mb-2">Price Alerts</h1>
+          <p className="text-gray-400">Get notified when sneaker prices hit your target</p>
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Create Alert */}
-            <div className="lg:col-span-2">
-              <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6 mb-6">
-                <h2 className="text-lg font-semibold text-white mb-4">Create New Alert</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Create Alert */}
+          <div className="lg:col-span-2">
+            <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6 mb-6">
+              <h2 className="text-lg font-semibold text-white mb-4">Create New Alert</h2>
                 
                 {/* Search */}
                 <div className="mb-4">
@@ -334,7 +324,6 @@ function Alerts() {
               </div>
             </div>
           </div>
-        </div>
       </div>
     </Layout>
   );

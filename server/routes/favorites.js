@@ -68,7 +68,8 @@ router.get('/', authenticateToken, async (req, res) => {
             addedDate: fav.createdAt.toISOString().split('T')[0],
             releaseDate: fav.releaseDate,
             gender: fav.gender,
-            volatility: fav.volatility
+            volatility: fav.volatility,
+            image: fav.image || null
           };
         } catch (err) {
           return {
@@ -85,7 +86,8 @@ router.get('/', authenticateToken, async (req, res) => {
             addedDate: fav.createdAt.toISOString().split('T')[0],
             releaseDate: fav.releaseDate,
             gender: fav.gender,
-            volatility: fav.volatility
+            volatility: fav.volatility,
+            image: fav.image || null
           };
         }
       })
@@ -108,7 +110,7 @@ router.get('/', authenticateToken, async (req, res) => {
  */
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { sneakerId, name, brand, colorway, styleCode, retailPrice, releaseDate, savedPrice, gender, volatility } = req.body;
+    const { sneakerId, name, brand, colorway, styleCode, retailPrice, releaseDate, savedPrice, gender, volatility, image } = req.body;
 
     if (!sneakerId || !name || !brand) {
       return res.status(400).json({ success: false, message: 'sneakerId, name, and brand are required' });
@@ -131,7 +133,8 @@ router.post('/', authenticateToken, async (req, res) => {
       releaseDate: releaseDate || '',
       savedPrice: savedPrice || retailPrice || 0,
       gender: gender || 'men',
-      volatility: volatility || 0.15
+      volatility: volatility || 0.15,
+      image: image || null
     });
 
     await favorite.save();

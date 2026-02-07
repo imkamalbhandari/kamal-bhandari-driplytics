@@ -45,6 +45,10 @@ const favoriteSchema = new mongoose.Schema({
   volatility: {
     type: Number,
     default: 0.15
+  },
+  image: {
+    type: String,
+    default: null
   }
 }, {
   timestamps: true

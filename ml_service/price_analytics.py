@@ -93,7 +93,7 @@ def calculate_macd(prices: np.ndarray, fast: int = 12, slow: int = 26, signal: i
 def calculate_volatility_metrics(prices: np.ndarray) -> Dict[str, float]:
     """Calculate various volatility metrics."""
     if len(prices) < 2:
-        return {'daily_volatility': 0, 'annualized_volatility': 0, 'max_drawdown': 0}
+        return {'daily_volatility': 0.0, 'annualized_volatility': 0.0, 'max_drawdown': 0.0, 'avg_daily_change': 0.0}
     
     returns = np.diff(prices) / prices[:-1]
     
@@ -106,10 +106,10 @@ def calculate_volatility_metrics(prices: np.ndarray) -> Dict[str, float]:
     max_drawdown = np.max(drawdown)
     
     return {
-        'daily_volatility': round(daily_vol * 100, 2),
-        'annualized_volatility': round(annualized_vol * 100, 2),
-        'max_drawdown': round(max_drawdown * 100, 2),
-        'avg_daily_change': round(np.mean(np.abs(returns)) * 100, 2)
+        'daily_volatility': round(float(daily_vol * 100), 2),
+        'annualized_volatility': round(float(annualized_vol * 100), 2),
+        'max_drawdown': round(float(max_drawdown * 100), 2),
+        'avg_daily_change': round(float(np.mean(np.abs(returns)) * 100), 2)
     }
 
 
@@ -146,11 +146,11 @@ def calculate_price_distribution(prices: np.ndarray, bins: int = 10) -> Dict[str
     hist, bin_edges = np.histogram(prices, bins=bins)
     
     return {
-        'counts': hist.tolist(),
-        'bin_edges': [round(x, 2) for x in bin_edges.tolist()],
-        'bin_labels': [f"${round(bin_edges[i], 0)}-${round(bin_edges[i+1], 0)}" for i in range(len(bin_edges)-1)],
-        'mode_price': round(bin_edges[np.argmax(hist)], 2),
-        'median_price': round(np.median(prices), 2)
+        'counts': [int(x) for x in hist.tolist()],
+        'bin_edges': [round(float(x), 2) for x in bin_edges.tolist()],
+        'bin_labels': [f"${round(float(bin_edges[i]), 0)}-${round(float(bin_edges[i+1]), 0)}" for i in range(len(bin_edges)-1)],
+        'mode_price': round(float(bin_edges[int(np.argmax(hist))]), 2),
+        'median_price': round(float(np.median(prices)), 2)
     }
 
 
@@ -179,14 +179,14 @@ def calculate_roi_metrics(prices: np.ndarray, retail_price: float) -> Dict[str, 
     annualized_roi = daily_roi * 365
     
     return {
-        'current_roi': round(roi_from_retail, 2),
-        'roi_from_first_sale': round(roi_from_first, 2),
-        'best_possible_roi': round(best_roi, 2),
-        'worst_possible_roi': round(worst_roi, 2),
-        'annualized_roi': round(annualized_roi, 2),
-        'profit_per_pair': round(current_price - retail_price, 2),
-        'max_profit_per_pair': round(max_price - retail_price, 2),
-        'days_tracked': days
+        'current_roi': round(float(roi_from_retail), 2),
+        'roi_from_first_sale': round(float(roi_from_first), 2),
+        'best_possible_roi': round(float(best_roi), 2),
+        'worst_possible_roi': round(float(worst_roi), 2),
+        'annualized_roi': round(float(annualized_roi), 2),
+        'profit_per_pair': round(float(current_price - retail_price), 2),
+        'max_profit_per_pair': round(float(max_price - retail_price), 2),
+        'days_tracked': int(days)
     }
 
 
@@ -234,12 +234,12 @@ def calculate_trend_analysis(prices: np.ndarray, dates: List[str]) -> Dict[str, 
         'trend': trend,
         'trend_emoji': trend_emoji,
         'trend_description': trend.replace('_', ' ').title(),
-        'strength': round(strength, 1),
-        'momentum': round(momentum, 2),
-        'overall_slope': round(overall_slope, 4),
-        'recent_slope': round(recent_slope, 4),
-        'is_uptrend': recent_slope > 0,
-        'is_accelerating': recent_slope > overall_slope
+        'strength': round(float(strength), 1),
+        'momentum': round(float(momentum), 2),
+        'overall_slope': round(float(overall_slope), 4),
+        'recent_slope': round(float(recent_slope), 4),
+        'is_uptrend': bool(recent_slope > 0),
+        'is_accelerating': bool(recent_slope > overall_slope)
     }
 
 
@@ -300,24 +300,24 @@ def get_detailed_price_analytics(sneaker_name: str) -> Dict[str, Any]:
         roi = calculate_roi_metrics(prices, retail_price)
         trend = calculate_trend_analysis(prices, dates)
         
-        # Basic statistics
+        # Basic statistics - ensure all values are Python native types
         stats = {
-            'current_price': round(prices[-1], 2),
-            'avg_price': round(np.mean(prices), 2),
-            'median_price': round(np.median(prices), 2),
-            'min_price': round(np.min(prices), 2),
-            'max_price': round(np.max(prices), 2),
-            'price_range': round(np.max(prices) - np.min(prices), 2),
-            'std_deviation': round(np.std(prices), 2),
+            'current_price': round(float(prices[-1]), 2),
+            'avg_price': round(float(np.mean(prices)), 2),
+            'median_price': round(float(np.median(prices)), 2),
+            'min_price': round(float(np.min(prices)), 2),
+            'max_price': round(float(np.max(prices)), 2),
+            'price_range': round(float(np.max(prices) - np.min(prices)), 2),
+            'std_deviation': round(float(np.std(prices)), 2),
             'total_sales': int(np.sum(volumes)),
-            'avg_daily_volume': round(np.mean(volumes), 1),
-            'retail_price': retail_price,
-            'premium_percent': round(((prices[-1] - retail_price) / retail_price) * 100, 2),
-            'data_points': len(prices),
+            'avg_daily_volume': round(float(np.mean(volumes)), 1),
+            'retail_price': float(retail_price),
+            'premium_percent': round(float((prices[-1] - retail_price) / retail_price * 100), 2),
+            'data_points': int(len(prices)),
             'date_range': {
                 'start': dates[0],
                 'end': dates[-1],
-                'days': len(dates)
+                'days': int(len(dates))
             }
         }
         
@@ -329,10 +329,10 @@ def get_detailed_price_analytics(sneaker_name: str) -> Dict[str, Any]:
         
         weekly_data = {
             'dates': weekly_df.index.strftime('%Y-%m-%d').tolist(),
-            'avg_prices': [round(x, 2) for x in weekly_df['avg'].tolist()],
-            'min_prices': [round(x, 2) for x in weekly_df['min'].tolist()],
-            'max_prices': [round(x, 2) for x in weekly_df['max'].tolist()],
-            'volumes': weekly_df['volume'].tolist()
+            'avg_prices': [round(float(x), 2) for x in weekly_df['avg'].tolist()],
+            'min_prices': [round(float(x), 2) for x in weekly_df['min'].tolist()],
+            'max_prices': [round(float(x), 2) for x in weekly_df['max'].tolist()],
+            'volumes': [int(x) for x in weekly_df['volume'].tolist()]
         }
         
         # Monthly aggregation
@@ -343,10 +343,10 @@ def get_detailed_price_analytics(sneaker_name: str) -> Dict[str, Any]:
         
         monthly_data = {
             'dates': monthly_df.index.strftime('%Y-%m').tolist(),
-            'avg_prices': [round(x, 2) for x in monthly_df['avg'].tolist()],
-            'min_prices': [round(x, 2) for x in monthly_df['min'].tolist()],
-            'max_prices': [round(x, 2) for x in monthly_df['max'].tolist()],
-            'volumes': monthly_df['volume'].tolist()
+            'avg_prices': [round(float(x), 2) for x in monthly_df['avg'].tolist()],
+            'min_prices': [round(float(x), 2) for x in monthly_df['min'].tolist()],
+            'max_prices': [round(float(x), 2) for x in monthly_df['max'].tolist()],
+            'volumes': [int(x) for x in monthly_df['volume'].tolist()]
         }
         
         # Price by size analysis
@@ -356,17 +356,17 @@ def get_detailed_price_analytics(sneaker_name: str) -> Dict[str, Any]:
         size_analysis.columns = ['size', 'avg_price', 'sales']
         
         size_data = {
-            'sizes': size_analysis['size'].tolist(),
-            'avg_prices': [round(x, 2) for x in size_analysis['avg_price'].tolist()],
-            'sales': size_analysis['sales'].tolist()
+            'sizes': [float(x) for x in size_analysis['size'].tolist()],
+            'avg_prices': [round(float(x), 2) for x in size_analysis['avg_price'].tolist()],
+            'sales': [int(x) for x in size_analysis['sales'].tolist()]
         }
         
         return {
             'success': True,
             'sneaker': {
-                'name': sneaker_info['Sneaker Name'],
-                'brand': sneaker_info['Brand'],
-                'retail_price': retail_price,
+                'name': str(sneaker_info['Sneaker Name']),
+                'brand': str(sneaker_info['Brand']),
+                'retail_price': float(retail_price),
                 'release_date': str(sneaker_info['Release Date'])
             },
             'statistics': stats,
@@ -376,18 +376,18 @@ def get_detailed_price_analytics(sneaker_name: str) -> Dict[str, Any]:
             'technical_indicators': {
                 'moving_averages': moving_averages,
                 'bollinger_bands': bollinger,
-                'rsi': rsi[-50:],  # Last 50 values
-                'macd': {k: v[-50:] for k, v in macd.items()},
+                'rsi': [float(x) for x in rsi[-50:]],  # Last 50 values
+                'macd': {k: [float(x) for x in v[-50:]] for k, v in macd.items()},
                 'support_resistance': support_resistance
             },
             'price_distribution': distribution,
             'charts': {
                 'daily': {
                     'dates': dates,
-                    'prices': [round(x, 2) for x in prices.tolist()],
-                    'min_prices': [round(x, 2) for x in min_prices.tolist()],
-                    'max_prices': [round(x, 2) for x in max_prices.tolist()],
-                    'volumes': volumes.tolist()
+                    'prices': [round(float(x), 2) for x in prices.tolist()],
+                    'min_prices': [round(float(x), 2) for x in min_prices.tolist()],
+                    'max_prices': [round(float(x), 2) for x in max_prices.tolist()],
+                    'volumes': [int(x) for x in volumes.tolist()]
                 },
                 'weekly': weekly_data,
                 'monthly': monthly_data,

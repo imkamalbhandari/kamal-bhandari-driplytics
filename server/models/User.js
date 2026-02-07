@@ -32,6 +32,31 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Subscription & Payment
+  subscription: {
+    type: {
+      type: String,
+      enum: ['free', 'premium', 'pro'],
+      default: 'free'
+    },
+    status: {
+      type: String,
+      enum: ['active', 'expired', 'cancelled'],
+      default: 'active'
+    },
+    startDate: Date,
+    endDate: Date,
+    khaltiTransactionId: String
+  },
+  // Free tier prediction limit tracking
+  freePredictionsUsed: {
+    type: Number,
+    default: 0
+  },
+  freePredictionsResetDate: {
+    type: Date,
+    default: Date.now
+  },
   // Search history tracking
   searchHistory: [{
     query: String,
@@ -65,6 +90,45 @@ userSchema.pre('save', async function() {
 // Method to compare password
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
+};
+
+// Method to check if user can make free prediction
+userSchema.methods.canMakeFreePrediction = async function() {
+  const FREE_LIMIT = 5;
+  const now = new Date();
+  const resetDate = new Date(this.freePredictionsResetDate);
+  
+  // Reset monthly - save the reset
+  if (now.getMonth() !== resetDate.getMonth() || now.getFullYear() !== resetDate.getFullYear()) {
+    this.freePredictionsUsed = 0;
+    this.freePredictionsResetDate = now;
+    await this.save();
+    return true;
+  }
+  
+  // Check if premium subscriber
+  if (this.subscription?.type !== 'free' && this.subscription?.status === 'active') {
+    if (this.subscription.endDate && new Date(this.subscription.endDate) > now) {
+      return true; // Premium user - unlimited
+    }
+  }
+  
+  return this.freePredictionsUsed < FREE_LIMIT;
+};
+
+// Method to increment prediction count
+userSchema.methods.incrementPredictionCount = async function() {
+  this.freePredictionsUsed += 1;
+  await this.save();
+};
+
+// Method to get remaining free predictions
+userSchema.methods.getRemainingFreePredictions = function() {
+  const FREE_LIMIT = 5;
+  if (this.subscription?.type !== 'free' && this.subscription?.status === 'active') {
+    return -1; // Unlimited for premium
+  }
+  return Math.max(0, FREE_LIMIT - this.freePredictionsUsed);
 };
 
 module.exports = mongoose.model('User', userSchema);

@@ -13,9 +13,9 @@ function Layout({ children, requireAuth = false }) {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-black">
       <Navbar />
-      <main className="flex-1 flex flex-col items-center w-full">
+      <main className="flex-1 w-full">
         {children}
       </main>
       <Footer />

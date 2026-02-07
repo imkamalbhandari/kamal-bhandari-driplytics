@@ -522,17 +522,39 @@ def search_sneakers():
 
 @app.route('/sneakers/stats', methods=['GET'])
 def get_sneaker_stats():
-    """Get price statistics by brand."""
+    """Get comprehensive price statistics and top sneakers."""
     try:
         brand = request.args.get('brand', None)
         
         collector = StockXDataCollector()
         stats = collector.get_price_stats(brand)
         
+        # Get hype scores for top sneakers
+        hype_scores = collector.get_hype_scores()
+        top_sneakers = sorted(hype_scores, key=lambda x: x.get('hype_score', 0), reverse=True)[:20]
+        
+        # Get brand counts
+        brand_counts = {}
+        if hasattr(collector, 'data') and not collector.data.empty:
+            brand_counts = collector.data['Brand'].value_counts().to_dict()
+        
+        # Get brands list
+        brands = list(brand_counts.keys()) if brand_counts else []
+        
         return jsonify({
             'success': True,
             'brand': brand or 'all',
-            'stats': stats
+            'data': {
+                'average_price': stats.get('avg_sale_price', 0),
+                'max_price': stats.get('max_price', 0),
+                'min_price': stats.get('min_price', 0),
+                'total_sneakers': stats.get('unique_sneakers', 0),
+                'total_sales': stats.get('total_sales', 0),
+                'avg_premium': stats.get('avg_premium', 0),
+                'brands': brands,
+                'brand_counts': brand_counts,
+                'top_sneakers': top_sneakers
+            }
         })
         
     except Exception as e:

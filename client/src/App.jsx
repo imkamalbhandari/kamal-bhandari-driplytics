@@ -13,6 +13,7 @@ import Compare from './pages/Compare';
 import Alerts from './pages/Alerts';
 import Favorites from './pages/Favorites';
 import Profile from './pages/Profile';
+import Subscription from './pages/Subscription';
 import './App.css';
 
 function App() {
@@ -33,6 +34,8 @@ function App() {
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/favorites" element={<Favorites />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/subscription" element={<Subscription />} />
+        <Route path="/subscription/verify" element={<Subscription />} />
       </Routes>
     </Router>
   );

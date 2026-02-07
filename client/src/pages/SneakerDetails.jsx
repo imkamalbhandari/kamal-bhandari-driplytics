@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
-import PriceAnalytics from '../components/PriceAnalytics';
-import api, { sneakerAPI, favoritesAPI, authAPI } from '../services/api';
+import { sneakerAPI, favoritesAPI, authAPI, paymentAPI } from '../services/api';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -30,19 +29,21 @@ ChartJS.register(
 function SneakerDetails() {
   const { id } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const [selectedSize, setSelectedSize] = useState('10');
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteId, setFavoriteId] = useState(null);
   const [timeRange, setTimeRange] = useState('30d');
   const [prediction, setPrediction] = useState(null);
   const [hypeScore, setHypeScore] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [priceHistory, setPriceHistory] = useState(null);
-  const [forecast, setForecast] = useState([]);
+  const [predictionStatus, setPredictionStatus] = useState(null);
+  const [, setForecast] = useState([]);
   const [predictionLoading, setPredictionLoading] = useState(false);
   const [showPrediction, setShowPrediction] = useState(false);
-  const [liveData, setLiveData] = useState(null);
-  const [liveDataLoading, setLiveDataLoading] = useState(false);
+  const [, setLiveData] = useState(null);
+  const [liveDataLoading] = useState(false);
 
   // Get sneaker data from location state
   const sneakerFromState = location.state?.sneaker;
@@ -55,6 +56,7 @@ function SneakerDetails() {
     styleCode: '',
     releaseDate: '',
     retailPrice: 0,
+    image: null,
     description: 'Loading sneaker details...',
     sizes: ['7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12', '13'],
     priceBySize: {
@@ -87,6 +89,7 @@ function SneakerDetails() {
               styleCode: sneakerData.StyleID || '',
               releaseDate: sneakerData.ReleaseDate || '',
               retailPrice: retailPrice,
+              image: sneakerData.Image || sneakerData.image_url || null,
               description: `${sneakerData.Name} - A premium sneaker from ${sneakerData.Brand}.`,
               sizes: ['7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12', '13'],
               priceBySize: {
@@ -152,7 +155,8 @@ function SneakerDetails() {
           releaseDate: sneaker.releaseDate,
           savedPrice: sneaker.priceBySize?.[selectedSize] || sneaker.retailPrice,
           gender: sneaker.gender,
-          volatility: sneaker.volatility
+          volatility: sneaker.volatility,
+          image: sneaker.image || null
         });
         if (response.success) {
           setIsFavorite(true);
@@ -164,8 +168,43 @@ function SneakerDetails() {
     }
   };
 
+  // Check prediction limit before predicting
+  const checkPredictionLimit = async () => {
+    try {
+      const response = await paymentAPI.checkPrediction();
+      setPredictionStatus(response);
+      return response;
+    } catch (error) {
+      console.error('Error checking prediction limit:', error);
+      // If server is down, don't allow prediction - enforce limit strictly
+      return { canPredict: false, remaining: 0, error: 'Unable to verify prediction limit' };
+    }
+  };
+
   // Handle Predict Price button click - Uses Social Media + Time Series + Linear Regression
   const handlePredictPrice = async () => {
+    // Check prediction limit first - must succeed
+    const status = await checkPredictionLimit();
+    
+    if (!status.canPredict) {
+      // Show subscription required modal
+      setPredictionStatus(status);
+      return;
+    }
+    
+    // Record prediction usage FIRST before making prediction
+    try {
+      const usageResponse = await paymentAPI.usePrediction();
+      if (!usageResponse.success) {
+        setPredictionStatus({ canPredict: false, remaining: 0, requiresSubscription: true });
+        return;
+      }
+    } catch (e) {
+      console.error('Could not record prediction usage:', e);
+      setPredictionStatus({ canPredict: false, remaining: 0, error: 'Failed to record prediction' });
+      return;
+    }
+    
     setPredictionLoading(true);
     setShowPrediction(true);
     
@@ -180,18 +219,33 @@ function SneakerDetails() {
         region: 'California'
       });
       
+      // Update remaining predictions count
+      try {
+        const updatedStatus = await checkPredictionLimit();
+        setPredictionStatus(updatedStatus);
+      } catch {
+        // Could not update prediction status
+      }
+      
       if (socialResponse.success) {
         const pred = socialResponse.prediction;
         const rec = socialResponse.recommendation;
         const models = socialResponse.models;
         const social = socialResponse.social_media;
+        const input = socialResponse.input;
         
         setPrediction({
-          // Main prediction
+          // Main prediction - FUTURE predicted price
           price: pred.predicted_price,
           priceRange: pred.price_range,
           
-          // Price change with UP/DOWN indicators
+          // Current market price from StockX (real data)
+          currentPrice: pred.current_price || pred.stockx_data?.current_price || sneaker.retailPrice,
+          retailPrice: pred.retail_price || sneaker.retailPrice,
+          hasRealData: input?.has_real_data || false,
+          stockxData: pred.stockx_data,
+          
+          // Price change with UP/DOWN indicators (future vs current)
           priceChange: pred.price_change,
           priceChangePercent: pred.price_change_percent,
           isIncrease: pred.is_increase,
@@ -214,12 +268,12 @@ function SneakerDetails() {
           recommendation: `${rec.emoji} ${rec.action} - ${rec.description}`,
           recommendationAction: rec.action,
           
-          // Price premium
+          // Price premium over retail
           pricePremium: pred.price_change,
+          premiumOverRetail: pred.stockx_data ? pred.stockx_data.price_change : null,
           
-          // Time Series forecast
+          // Time Series forecast (no model name exposed)
           timeSeries: models.time_series ? {
-            model: models.time_series.model,
             price7d: models.time_series.price_7d,
             price14d: models.time_series.price_14d,
             price30d: models.time_series.price_30d,
@@ -229,12 +283,17 @@ function SneakerDetails() {
             confidence: models.time_series.confidence
           } : null,
           
-          // Linear Regression
+          // Linear Regression (no model name exposed)
           linearRegression: models.linear_regression ? {
-            model: models.linear_regression.model,
             predictedPrice: models.linear_regression.predicted_price,
             confidence: models.linear_regression.confidence
           } : null,
+          
+          // User-friendly factors from AI
+          factorsConsidered: pred.factors_considered || [],
+          
+          // Forecast data (user-friendly)
+          forecast: pred.forecast || null,
           
           // Social Media Data
           socialMedia: {
@@ -245,8 +304,7 @@ function SneakerDetails() {
           },
           
           // Metadata
-          processingTime: socialResponse.metadata?.processing_time,
-          modelsUsed: socialResponse.metadata?.models_used
+          processingTime: socialResponse.metadata?.processing_time
         });
         
         // Store forecast for chart
@@ -295,7 +353,7 @@ function SneakerDetails() {
           socialResponse.prediction?.predicted_price || sneaker.retailPrice,
           Math.round(socialResponse.prediction?.confidence * 100) || 70
         );
-      } catch (e) {
+      } catch {
         // Silently fail
       }
 
@@ -349,7 +407,6 @@ function SneakerDetails() {
       
       // Filter based on timeRange
       let filteredDates, filteredPrices;
-      const totalDays = dates.length;
       
       switch (timeRange) {
         case '7d':
@@ -473,8 +530,7 @@ function SneakerDetails() {
 
   return (
     <Layout requireAuth>
-      <div className="flex-1 w-full">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-sm text-gray-400 mb-6">
           <Link to="/search" className="hover:text-white transition-colors">Search</Link>
@@ -557,16 +613,54 @@ function SneakerDetails() {
                 </div>
               </div>
 
+              {/* Prediction Limit Status */}
+              {predictionStatus && !predictionStatus.canPredict && (
+                <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <svg className="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div className="flex-1">
+                      <p className="text-yellow-400 font-medium">Free Limit Reached</p>
+                      <p className="text-gray-400 text-sm">You've used all 5 free predictions this month.</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => navigate('/subscription')}
+                    className="w-full mt-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-lg hover:from-indigo-500 hover:to-purple-500 transition-all"
+                  >
+                    Upgrade to Premium - Unlimited Predictions
+                  </button>
+                </div>
+              )}
+
+              {/* Remaining Predictions Counter */}
+              {predictionStatus && predictionStatus.canPredict && predictionStatus.remaining !== -1 && (
+                <div className="mt-4 flex items-center justify-center gap-2 text-sm">
+                  <span className="text-gray-400">Free predictions remaining:</span>
+                  <span className={`font-bold ${predictionStatus.remaining <= 2 ? 'text-yellow-400' : 'text-green-400'}`}>
+                    {predictionStatus.remaining} / 5
+                  </span>
+                </div>
+              )}
+
               {/* PREDICT PRICE BUTTON */}
               <button
                 onClick={handlePredictPrice}
-                disabled={predictionLoading}
-                className="w-full mt-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-lg rounded-xl transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                disabled={predictionLoading || (predictionStatus && !predictionStatus.canPredict)}
+                className="w-full mt-4 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-lg rounded-xl transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
               >
                 {predictionLoading ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
                     Analyzing Social Media & Trends...
+                  </>
+                ) : predictionStatus && !predictionStatus.canPredict ? (
+                  <>
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    Subscription Required
                   </>
                 ) : (
                   <>
@@ -632,559 +726,378 @@ function SneakerDetails() {
           </div>
         </div>
 
-        {/* 📊 Detailed Price Analytics Section */}
-        <div className="mb-8">
-          <PriceAnalytics 
-            sneakerName={sneaker.name} 
-            retailPrice={sneaker.retailPrice} 
-          />
-        </div>
-
-        {/* AI Prediction & Market Stats - Only show after clicking Predict */}
+        {/* AI Prediction Results - Clean Card Layout */}
         {showPrediction && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* AI Prediction */}
-          <div className="bg-gradient-to-br from-indigo-600/20 to-purple-600/20 backdrop-blur-sm rounded-2xl border border-indigo-500/30 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-indigo-500/30 rounded-xl flex items-center justify-center">
-                <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-white font-semibold">AI Price Prediction</h3>
-                <p className="text-gray-400 text-sm">Next {prediction?.timeframe || '30 days'}</p>
-              </div>
-            </div>
-
-            {predictionLoading ? (
-              <div className="flex flex-col items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500 mb-3"></div>
-                <p className="text-gray-400 text-sm">Analyzing social media & trends...</p>
-              </div>
-            ) : prediction ? (
-              <>
-                <div className="flex items-end gap-4 mb-4">
-                  <div>
-                    <p className="text-gray-400 text-sm mb-1">Predicted Sale Price</p>
-                    <p className="text-4xl font-bold text-white">${Math.round(prediction.price)}</p>
-                  </div>
-                  {/* UP/DOWN Percentage Display */}
-                  <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-lg ${
-                    prediction.isIncrease || prediction.trend === 'up'
-                      ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
-                      : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                  }`}>
-                    {prediction.isIncrease || prediction.trend === 'up' ? (
-                      <>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" />
-                        </svg>
-                        <span>↑ {Math.abs(prediction.priceChangePercent || parseFloat(prediction.changePercent)).toFixed(1)}%</span>
-                        <span className="text-xs opacity-75">UP</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
-                        </svg>
-                        <span>↓ {Math.abs(prediction.priceChangePercent || parseFloat(prediction.changePercent)).toFixed(1)}%</span>
-                        <span className="text-xs opacity-75">DOWN</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Price Premium with UP/DOWN */}
-                {prediction.pricePremium !== undefined && (
-                  <div className={`rounded-lg p-4 mb-4 ${
-                    prediction.pricePremium >= 0 
-                      ? 'bg-green-500/10 border border-green-500/30' 
-                      : 'bg-red-500/10 border border-red-500/30'
-                  }`}>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-300 text-sm font-medium">
-                        {prediction.pricePremium >= 0 ? '📈 Expected Profit' : '📉 Expected Loss'}
-                      </span>
-                      <div className={`flex items-center gap-2 font-bold text-xl ${
-                        prediction.pricePremium >= 0 ? 'text-green-400' : 'text-red-400'
-                      }`}>
-                        <span>{prediction.pricePremium >= 0 ? '↑' : '↓'}</span>
-                        <span>${Math.abs(Math.round(prediction.pricePremium))}</span>
-                      </div>
-                    </div>
-                    {prediction.socialImpact && (
-                      <p className="text-gray-500 text-xs mt-2">
-                        Social media impact: {prediction.socialImpact}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="flex-1 bg-white/10 rounded-full h-2 overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"
-                      style={{ width: `${prediction.confidence}%` }}
-                    ></div>
-                  </div>
-                  <span className="text-white font-medium text-sm">{prediction.confidence}% confidence</span>
-                </div>
-
-                {prediction.recommendation && (
-                  <div className={`rounded-lg p-3 mb-4 ${
-                    prediction.recommendation.includes('Buy') ? 'bg-green-500/10 border border-green-500/30' :
-                    prediction.recommendation.includes('Sell') || prediction.recommendation.includes('Avoid') ? 'bg-red-500/10 border border-red-500/30' :
-                    'bg-yellow-500/10 border border-yellow-500/30'
-                  }`}>
-                    <p className="text-sm font-medium">
-                      {prediction.recommendation}
-                    </p>
-                  </div>
-                )}
-
-                {/* Models Used - Time Series + Linear Regression */}
-                <div className="border-t border-white/10 pt-4 mt-4">
-                  <p className="text-gray-400 text-xs mb-3">Models Used</p>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    {/* Time Series */}
-                    <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 rounded-xl p-3 border border-purple-500/20">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2 h-2 rounded-full bg-purple-400"></div>
-                        <p className="text-purple-300 text-xs font-medium">Time Series</p>
-                      </div>
-                      <p className="text-white font-bold text-lg">
-                        ${prediction.timeSeries?.price30d ? Math.round(prediction.timeSeries.price30d) : 'N/A'}
-                      </p>
-                      <p className="text-gray-500 text-xs mt-1">
-                        {prediction.timeSeries?.model || 'Prophet'}
-                      </p>
-                    </div>
-                    
-                    {/* Linear Regression */}
-                    <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-xl p-3 border border-blue-500/20">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2 h-2 rounded-full bg-blue-400"></div>
-                        <p className="text-blue-300 text-xs font-medium">Linear Regression</p>
-                      </div>
-                      <p className="text-white font-bold text-lg">
-                        ${prediction.linearRegression?.predictedPrice ? Math.round(prediction.linearRegression.predictedPrice) : 'N/A'}
-                      </p>
-                      <p className="text-gray-500 text-xs mt-1">
-                        {prediction.linearRegression?.model || 'Ridge'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Time-Series Forecast */}
-                {prediction.timeSeries && prediction.timeSeries.price7d && (
-                  <div className="border-t border-white/10 pt-4 mt-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
-                      <p className="text-gray-400 text-xs">Price Forecast ({prediction.timeSeries.model})</p>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-sm">
-                      <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 rounded-lg p-3 border border-purple-500/20">
-                        <p className="text-gray-500 text-xs mb-1">7 Days</p>
-                        <p className="text-white font-bold">${prediction.timeSeries.price7d ? Math.round(prediction.timeSeries.price7d) : 'N/A'}</p>
-                      </div>
-                      <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 rounded-lg p-3 border border-purple-500/20">
-                        <p className="text-gray-500 text-xs mb-1">14 Days</p>
-                        <p className="text-white font-bold">${prediction.timeSeries.price14d ? Math.round(prediction.timeSeries.price14d) : 'N/A'}</p>
-                      </div>
-                      <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 rounded-lg p-3 border border-purple-500/20">
-                        <p className="text-gray-500 text-xs mb-1">30 Days</p>
-                        <p className="text-white font-bold">${prediction.timeSeries.price30d ? Math.round(prediction.timeSeries.price30d) : 'N/A'}</p>
-                      </div>
-                    </div>
-                    {prediction.timeSeries.lowerBound && prediction.timeSeries.upperBound && (
-                      <div className="mt-2 bg-white/5 rounded-lg p-2 text-center">
-                        <p className="text-gray-500 text-xs">30-Day Range</p>
-                        <p className="text-gray-300 text-sm">
-                          ${Math.round(prediction.timeSeries.lowerBound)} - ${Math.round(prediction.timeSeries.upperBound)}
-                        </p>
-                      </div>
-                    )}
-                    {prediction.timeSeries.dataPoints > 0 && (
-                      <p className="text-gray-500 text-xs mt-2 text-center">
-                        Based on {prediction.timeSeries.dataPoints} historical data points
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Social Media Impact Summary */}
-                {prediction.socialMedia && (
-                  <div className="border-t border-white/10 pt-4 mt-4">
-                    <p className="text-gray-400 text-xs mb-2">Social Media Impact</p>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="bg-gradient-to-r from-orange-500/10 to-pink-500/10 rounded-lg p-3 border border-orange-500/20">
-                        <p className="text-gray-500 text-xs">Social Score</p>
-                        <p className="text-orange-400 font-bold text-lg">{Math.round(prediction.socialMedia.combinedScore)}/100</p>
-                      </div>
-                      <div className={`rounded-lg p-3 border ${
-                        prediction.socialMedia.adjustmentPercent >= 0 
-                          ? 'bg-green-500/10 border-green-500/20' 
-                          : 'bg-red-500/10 border-red-500/20'
-                      }`}>
-                        <p className="text-gray-500 text-xs">Price Impact</p>
-                        <p className={`font-bold text-lg ${
-                          prediction.socialMedia.adjustmentPercent >= 0 ? 'text-green-400' : 'text-red-400'
-                        }`}>
-                          {prediction.socialMedia.adjustmentPercent >= 0 ? '↑' : '↓'} 
-                          {Math.abs(prediction.socialMedia.adjustmentPercent).toFixed(1)}%
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="text-center py-8 text-gray-400">
-                Click "Predict Price" to get AI prediction
-              </div>
-            )}
-          </div>
-
-          {/* Hype Score & Market Stats */}
           <div className="space-y-6">
-            {/* Live Hype Score - REAL Reddit Data */}
-            {hypeScore && (
-              <div className="bg-gradient-to-br from-orange-600/20 to-red-600/20 backdrop-blur-sm rounded-2xl border border-orange-500/30 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-orange-500/30 rounded-xl flex items-center justify-center">
-                      <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+            {/* Main Prediction Hero Card */}
+            <div className="bg-gradient-to-br from-indigo-600/20 to-purple-600/20 backdrop-blur-sm rounded-2xl border border-indigo-500/30 p-8">
+              {predictionLoading ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
+                  <p className="text-gray-400">Analyzing market data & social trends...</p>
+                </div>
+              ) : prediction ? (
+                <>
+                  {/* Header */}
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-12 h-12 bg-indigo-500/30 rounded-xl flex items-center justify-center">
+                      <svg className="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                       </svg>
                     </div>
                     <div>
-                      <h3 className="text-white font-semibold">
-                        🔴 LIVE Reddit Hype
-                      </h3>
-                      <p className="text-gray-400 text-sm">
-                        Real-time data from Reddit
-                      </p>
+                      <h2 className="text-xl font-bold text-white">AI Price Prediction</h2>
+                      <p className="text-gray-400 text-sm">Next {prediction?.timeframe || '30 days'}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-bold text-white">{Math.round(hypeScore.hype_score)}</div>
-                    <div className="text-xs text-gray-500">/ 100</div>
+
+                  {/* Price Comparison - Large Display */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    {/* Current Price */}
+                    <div className="bg-white/5 rounded-2xl p-6 border border-white/10 text-center">
+                      <p className="text-gray-400 text-sm mb-2">Current Market Price</p>
+                      <p className="text-4xl font-bold text-white mb-1">
+                        ${Math.round(prediction.currentPrice || prediction.stockxData?.current_price || sneaker.retailPrice)}
+                      </p>
+                      {prediction.hasRealData && (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-green-400 bg-green-500/10 px-2 py-1 rounded-full">
+                          <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
+                          Live from StockX
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Expected Change */}
+                    {prediction.pricePremium !== undefined && (
+                      <div className={`rounded-2xl p-6 border text-center ${
+                        prediction.pricePremium >= 0 
+                          ? 'bg-green-500/10 border-green-500/30' 
+                          : 'bg-red-500/10 border-red-500/30'
+                      }`}>
+                        <p className="text-gray-400 text-sm mb-2">Expected Change</p>
+                        <p className={`text-4xl font-bold mb-1 ${
+                          prediction.pricePremium >= 0 ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {prediction.pricePremium >= 0 ? '+' : '-'}${Math.abs(Math.round(prediction.pricePremium))}
+                        </p>
+                        <span className={`text-sm ${
+                          prediction.pricePremium >= 0 ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {prediction.isIncrease ? '↑' : '↓'} {Math.abs(prediction.priceChangePercent || 0).toFixed(1)}%
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Predicted Price */}
+                    <div className={`rounded-2xl p-6 border text-center ${
+                      prediction.isIncrease || prediction.trend === 'up'
+                        ? 'bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/30'
+                        : 'bg-gradient-to-br from-red-500/10 to-rose-500/10 border-red-500/30'
+                    }`}>
+                      <p className="text-gray-400 text-sm mb-2">Predicted in 30 Days</p>
+                      <p className="text-4xl font-bold text-white mb-1">${Math.round(prediction.price)}</p>
+                      <span className={`inline-flex items-center gap-1 text-sm font-medium px-2 py-1 rounded-full ${
+                        prediction.isIncrease || prediction.trend === 'up' 
+                          ? 'text-green-400 bg-green-500/20' 
+                          : 'text-red-400 bg-red-500/20'
+                      }`}>
+                        {prediction.isIncrease ? '↑ UP' : '↓ DOWN'}
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Confidence & Recommendation Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Confidence */}
+                    <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-gray-400 text-sm">Confidence Level</span>
+                        <span className="text-white font-bold">{prediction.confidence}%</span>
+                      </div>
+                      <div className="h-3 bg-white/10 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all"
+                          style={{ width: `${prediction.confidence}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* Recommendation */}
+                    {prediction.recommendation && (
+                      <div className={`rounded-xl p-4 border ${
+                        prediction.recommendation.includes('Buy') ? 'bg-green-500/10 border-green-500/30' :
+                        prediction.recommendation.includes('Sell') || prediction.recommendation.includes('Avoid') ? 'bg-red-500/10 border-red-500/30' :
+                        'bg-yellow-500/10 border-yellow-500/30'
+                      }`}>
+                        <p className="text-sm font-medium text-white">{prediction.recommendation}</p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-12 text-gray-400">
+                  Click "Predict Price" above to get AI prediction
                 </div>
-                
-                {/* Progress Bar */}
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="flex-1 bg-white/10 rounded-full h-3 overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-orange-500 to-red-500 rounded-full transition-all"
-                      style={{ width: `${hypeScore.hype_score}%` }}
-                    ></div>
-                  </div>
-                  <span className={`text-sm font-bold px-3 py-1 rounded-lg ${
-                    hypeScore.engagement_level === 'viral' ? 'bg-red-500/30 text-red-300' :
-                    hypeScore.engagement_level === 'high' ? 'bg-orange-500/30 text-orange-300' :
-                    hypeScore.engagement_level === 'moderate' ? 'bg-yellow-500/30 text-yellow-300' :
-                    'bg-gray-500/30 text-gray-300'
-                  }`}>
-                    {hypeScore.engagement_level === 'viral' ? '🔥 VIRAL' :
-                     hypeScore.engagement_level === 'high' ? '📈 HIGH' :
-                     hypeScore.engagement_level === 'moderate' ? '📊 MODERATE' : '📉 LOW'}
-                  </span>
-                </div>
-                
-                {/* Reddit Stats Grid */}
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                  <div className="bg-white/5 rounded-xl p-3 text-center">
-                    <p className="text-2xl font-bold text-white">{hypeScore.posts_found || 0}</p>
-                    <p className="text-gray-500 text-xs">Posts Found</p>
-                  </div>
-                  <div className="bg-white/5 rounded-xl p-3 text-center">
-                    <p className="text-2xl font-bold text-orange-400">{hypeScore.total_upvotes || 0}</p>
-                    <p className="text-gray-500 text-xs">↑ Upvotes</p>
-                  </div>
-                  <div className="bg-white/5 rounded-xl p-3 text-center">
-                    <p className="text-2xl font-bold text-blue-400">{hypeScore.total_comments || 0}</p>
-                    <p className="text-gray-500 text-xs">💬 Comments</p>
-                  </div>
-                </div>
-                
-                {/* Sentiment Label */}
-                <div className={`px-4 py-2 rounded-xl text-center font-medium ${
-                  hypeScore.sentiment_label === 'Positive' 
-                    ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
-                    : hypeScore.sentiment_label === 'Negative'
-                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                    : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
-                }`}>
-                  {hypeScore.sentiment_label === 'Positive' ? '😊 Community is Positive!' : 
-                   hypeScore.sentiment_label === 'Negative' ? '😞 Community is Negative' : 
-                   '😐 Community is Neutral'}
-                </div>
-                
-                {/* Top Posts Preview */}
-                {hypeScore.top_posts && hypeScore.top_posts.length > 0 && (
-                  <div className="border-t border-white/10 pt-4 mt-4">
-                    <p className="text-gray-400 text-xs mb-2 flex items-center gap-2">
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0z"/>
-                      </svg>
-                      Top Reddit Discussions:
-                    </p>
-                    <div className="space-y-2">
-                      {hypeScore.top_posts.slice(0, 3).map((post, idx) => (
-                        <a 
-                          key={idx}
-                          href={post.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block bg-white/5 rounded-lg p-2 hover:bg-white/10 transition-colors"
-                        >
-                          <p className="text-white text-xs line-clamp-1">{post.title}</p>
-                          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                            <span className="text-orange-400 font-medium">↑{post.score}</span>
-                            <span className="text-blue-400">💬{post.comments}</span>
-                            <span className="text-gray-600">r/{post.subreddit}</span>
+              )}
+            </div>
+
+            {/* Two Column Layout for Forecast & Social */}
+            {prediction && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column - Forecast & Market Data */}
+                <div className="space-y-6">
+                  {/* Price Forecast Card */}
+                  {prediction.timeSeries && prediction.timeSeries.price7d && (
+                    <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <h3 className="text-white font-semibold">Price Forecast</h3>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 rounded-xl p-4 text-center border border-purple-500/20">
+                          <p className="text-gray-500 text-xs mb-1">7 Days</p>
+                          <p className="text-white font-bold text-xl">${Math.round(prediction.timeSeries.price7d)}</p>
+                        </div>
+                        <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 rounded-xl p-4 text-center border border-purple-500/20">
+                          <p className="text-gray-500 text-xs mb-1">14 Days</p>
+                          <p className="text-white font-bold text-xl">${Math.round(prediction.timeSeries.price14d)}</p>
+                        </div>
+                        <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 rounded-xl p-4 text-center border border-purple-500/20">
+                          <p className="text-gray-500 text-xs mb-1">30 Days</p>
+                          <p className="text-white font-bold text-xl">${Math.round(prediction.timeSeries.price30d)}</p>
+                        </div>
+                      </div>
+
+                      {prediction.timeSeries.lowerBound && prediction.timeSeries.upperBound && (
+                        <div className="mt-4 bg-white/5 rounded-xl p-3 text-center">
+                          <p className="text-gray-500 text-xs mb-1">30-Day Price Range</p>
+                          <p className="text-white font-medium">
+                            ${Math.round(prediction.timeSeries.lowerBound)} — ${Math.round(prediction.timeSeries.upperBound)}
+                          </p>
+                        </div>
+                      )}
+
+                      {prediction.timeSeries.dataPoints > 0 && (
+                        <p className="text-gray-500 text-xs mt-3 text-center">
+                          Based on {prediction.timeSeries.dataPoints} historical data points
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Market Stats Card */}
+                  <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
+                    <h3 className="text-white font-semibold mb-4">Market Data (Size {selectedSize})</h3>
+                    <div className="space-y-3">
+                      {marketStats.map((stat, index) => (
+                        <div key={index} className="flex items-center justify-between py-3 px-4 bg-white/5 rounded-xl">
+                          <div>
+                            <p className="text-white font-medium">{stat.label}</p>
+                            <p className="text-gray-500 text-xs">{stat.platform}</p>
                           </div>
-                        </a>
+                          <p className="text-white font-bold text-lg">{stat.value}</p>
+                        </div>
                       ))}
                     </div>
                   </div>
-                )}
-              </div>
-            )}
-
-            {liveDataLoading && !hypeScore && (
-              <div className="bg-gradient-to-br from-orange-600/20 to-red-600/20 backdrop-blur-sm rounded-2xl border border-orange-500/30 p-6">
-                <div className="flex flex-col items-center justify-center py-6">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500 mb-3"></div>
-                  <p className="text-gray-400 text-sm">Fetching live social data...</p>
                 </div>
-              </div>
-            )}
 
-            {/* Market Stats */}
-            <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
-              <h3 className="text-white font-semibold mb-4">Market Data (Size {selectedSize})</h3>
-              <div className="space-y-4">
-                {marketStats.map((stat, index) => (
-                  <div key={index} className="flex items-center justify-between py-3 border-b border-white/10 last:border-0">
-                    <div>
-                      <p className="text-white font-medium">{stat.label}</p>
-                      <p className="text-gray-400 text-xs">{stat.platform}</p>
+                {/* Right Column - Social Hype */}
+                <div className="space-y-6">
+                  {/* Reddit Hype Score Card */}
+                  {hypeScore && (
+                    <div className="bg-gradient-to-br from-orange-600/20 to-red-600/20 backdrop-blur-sm rounded-2xl border border-orange-500/30 p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-orange-500/30 rounded-xl flex items-center justify-center">
+                            <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h3 className="text-white font-semibold flex items-center gap-2">
+                              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                              LIVE Reddit Hype
+                            </h3>
+                            <p className="text-gray-400 text-xs">Real-time data from Reddit</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-3xl font-bold text-white">{Math.round(hypeScore.hype_score)}</div>
+                          <div className="text-xs text-gray-500">/ 100</div>
+                        </div>
+                      </div>
+                      
+                      {/* Hype Bar */}
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="flex-1 bg-white/10 rounded-full h-3 overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-orange-500 to-red-500 rounded-full transition-all"
+                            style={{ width: `${hypeScore.hype_score}%` }}
+                          ></div>
+                        </div>
+                        <span className={`text-xs font-bold px-3 py-1 rounded-lg whitespace-nowrap ${
+                          hypeScore.engagement_level === 'viral' ? 'bg-red-500/30 text-red-300' :
+                          hypeScore.engagement_level === 'high' ? 'bg-orange-500/30 text-orange-300' :
+                          hypeScore.engagement_level === 'moderate' ? 'bg-yellow-500/30 text-yellow-300' :
+                          'bg-gray-500/30 text-gray-300'
+                        }`}>
+                          {hypeScore.engagement_level === 'viral' ? '🔥 VIRAL' :
+                           hypeScore.engagement_level === 'high' ? '📈 HIGH' :
+                           hypeScore.engagement_level === 'moderate' ? '📊 MODERATE' : '📉 LOW'}
+                        </span>
+                      </div>
+                      
+                      {/* Stats */}
+                      <div className="grid grid-cols-3 gap-2 mb-4">
+                        <div className="bg-white/5 rounded-xl p-3 text-center">
+                          <p className="text-xl font-bold text-white">{hypeScore.posts_found || 0}</p>
+                          <p className="text-gray-500 text-xs">Posts</p>
+                        </div>
+                        <div className="bg-white/5 rounded-xl p-3 text-center">
+                          <p className="text-xl font-bold text-orange-400">{hypeScore.total_upvotes || 0}</p>
+                          <p className="text-gray-500 text-xs">Upvotes</p>
+                        </div>
+                        <div className="bg-white/5 rounded-xl p-3 text-center">
+                          <p className="text-xl font-bold text-blue-400">{hypeScore.total_comments || 0}</p>
+                          <p className="text-gray-500 text-xs">Comments</p>
+                        </div>
+                      </div>
+                      
+                      {/* Sentiment */}
+                      <div className={`px-4 py-2 rounded-xl text-center font-medium ${
+                        hypeScore.sentiment_label === 'Positive' 
+                          ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                          : hypeScore.sentiment_label === 'Negative'
+                          ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                          : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+                      }`}>
+                        {hypeScore.sentiment_label === 'Positive' ? '😊 Community is Positive!' : 
+                         hypeScore.sentiment_label === 'Negative' ? '😞 Community is Negative' : 
+                         '😐 Community is Neutral'}
+                      </div>
+                      
+                      {/* Top Posts */}
+                      {hypeScore.top_posts && hypeScore.top_posts.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-white/10">
+                          <p className="text-gray-400 text-xs mb-2">Top Reddit Discussions</p>
+                          <div className="space-y-2">
+                            {hypeScore.top_posts.slice(0, 2).map((post, idx) => (
+                              <a 
+                                key={idx}
+                                href={post.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block bg-white/5 rounded-lg p-3 hover:bg-white/10 transition-colors"
+                              >
+                                <p className="text-white text-sm line-clamp-1">{post.title}</p>
+                                <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                                  <span className="text-orange-400 font-medium">↑{post.score}</span>
+                                  <span className="text-blue-400">💬 {post.comments}</span>
+                                  <span>r/{post.subreddit}</span>
+                                </div>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-white font-semibold text-lg">{stat.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-        )}
+                  )}
 
-        {/* 📱 Social Media Presence Section */}
-        {showPrediction && prediction?.socialMedia && (
-          <div className="mt-8 bg-gradient-to-br from-orange-900/20 to-pink-900/20 backdrop-blur-sm rounded-2xl border border-orange-500/30 p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-pink-500 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-white">📱 Social Media Presence</h3>
-                <p className="text-gray-400 text-sm">
-                  Price adjusted by social hype and trends
-                  {prediction.processingTime && ` • ${prediction.processingTime.toFixed(2)}s`}
-                </p>
-              </div>
-            </div>
-
-            {/* Combined Social Score */}
-            <div className="mb-6 bg-white/5 rounded-xl p-4">
-              <div className="text-center mb-4">
-                <p className="text-gray-400 text-sm mb-2">Social Hype Score</p>
-                <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-pink-400">
-                  {Math.round(prediction.socialMedia.combinedScore)}
-                </div>
-                <p className="text-gray-500 text-xs mt-2">out of 100</p>
-                
-                {/* Progress bar */}
-                <div className="mt-4 h-3 bg-white/10 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-orange-500 to-pink-500 rounded-full transition-all"
-                    style={{ width: `${prediction.socialMedia.combinedScore}%` }}
-                  ></div>
-                </div>
-                
-                {/* Reddit Posts Count */}
-                {prediction.socialMedia.reddit && (
-                  <div className="mt-4 flex items-center justify-center gap-4 text-sm">
-                    <div className="flex items-center gap-1">
-                      <span className="text-orange-400 font-bold">{prediction.socialMedia.reddit.posts_found}</span>
-                      <span className="text-gray-500">Reddit posts</span>
-                    </div>
-                    <span className="text-gray-600">•</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-orange-400 font-bold">{prediction.socialMedia.reddit.total_upvotes || 0}</span>
-                      <span className="text-gray-500">upvotes</span>
-                    </div>
-                    <span className="text-gray-600">•</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-blue-400 font-bold">{prediction.socialMedia.reddit.total_comments || 0}</span>
-                      <span className="text-gray-500">comments</span>
-                    </div>
-                  </div>
-                )}
-                
-                {prediction.socialMedia.adjustmentPercent !== 0 && (
-                  <p className={`mt-3 text-sm font-medium ${
-                    prediction.socialMedia.adjustmentPercent > 0 ? 'text-green-400' : 'text-red-400'
-                  }`}>
-                    {prediction.socialMedia.adjustmentPercent > 0 ? '↑' : '↓'} 
-                    {' '}{Math.abs(prediction.socialMedia.adjustmentPercent).toFixed(1)}% price adjustment from social data
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Social Media Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Reddit Sentiment - REAL DATA */}
-              {prediction.socialMedia.reddit && (
-                <div className="bg-gradient-to-br from-orange-500/10 to-red-500/10 rounded-xl p-4 border border-orange-500/20">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <svg className="w-5 h-5 text-orange-400" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/>
-                      </svg>
-                      <span className="text-orange-300 font-medium">Reddit (Live Data)</span>
-                    </div>
-                    <span className="text-xs text-gray-500 bg-white/5 px-2 py-1 rounded">
-                      🔴 Real-time
-                    </span>
-                  </div>
-                  
-                  {/* Stats Grid */}
-                  <div className="grid grid-cols-3 gap-2 text-sm mb-3">
-                    <div className="bg-white/5 rounded-lg p-2 text-center">
-                      <p className="text-gray-500 text-xs">Posts Found</p>
-                      <p className="text-white font-bold text-xl">{prediction.socialMedia.reddit.posts_found}</p>
-                    </div>
-                    <div className="bg-white/5 rounded-lg p-2 text-center">
-                      <p className="text-gray-500 text-xs">Total Upvotes</p>
-                      <p className="text-orange-400 font-bold text-xl">{prediction.socialMedia.reddit.total_upvotes || 0}</p>
-                    </div>
-                    <div className="bg-white/5 rounded-lg p-2 text-center">
-                      <p className="text-gray-500 text-xs">Comments</p>
-                      <p className="text-blue-400 font-bold text-xl">{prediction.socialMedia.reddit.total_comments || 0}</p>
-                    </div>
-                  </div>
-                  
-                  {/* Sentiment */}
-                  <div className={`px-3 py-2 rounded-lg text-center font-medium mb-3 ${
-                    prediction.socialMedia.reddit.sentiment_label === 'Positive' 
-                      ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
-                      : prediction.socialMedia.reddit.sentiment_label === 'Negative'
-                      ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                      : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
-                  }`}>
-                    {prediction.socialMedia.reddit.sentiment_label === 'Positive' ? '😊' : 
-                     prediction.socialMedia.reddit.sentiment_label === 'Negative' ? '😞' : '😐'}
-                    {' '}{prediction.socialMedia.reddit.sentiment_label} Sentiment 
-                    <span className="text-xs opacity-75 ml-2">
-                      (Hype: {Math.round(prediction.socialMedia.reddit.hype_score || 50)}/100)
-                    </span>
-                  </div>
-                  
-                  {/* Top Posts */}
-                  {prediction.socialMedia.reddit.top_posts && prediction.socialMedia.reddit.top_posts.length > 0 && (
-                    <div className="border-t border-white/10 pt-3">
-                      <p className="text-gray-400 text-xs mb-2">Top Reddit Posts:</p>
-                      <div className="space-y-2 max-h-40 overflow-y-auto">
-                        {prediction.socialMedia.reddit.top_posts.map((post, idx) => (
-                          <a 
-                            key={idx}
-                            href={post.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block bg-white/5 rounded-lg p-2 hover:bg-white/10 transition-colors"
-                          >
-                            <p className="text-white text-xs line-clamp-1">{post.title}</p>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                              <span className="text-orange-400">↑ {post.score}</span>
-                              <span className="text-blue-400">💬 {post.comments}</span>
-                              <span>r/{post.subreddit}</span>
-                            </div>
-                          </a>
-                        ))}
+                  {liveDataLoading && !hypeScore && (
+                    <div className="bg-gradient-to-br from-orange-600/20 to-red-600/20 backdrop-blur-sm rounded-2xl border border-orange-500/30 p-6">
+                      <div className="flex flex-col items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500 mb-3"></div>
+                        <p className="text-gray-400 text-sm">Fetching live social data...</p>
                       </div>
                     </div>
                   )}
-                  
-                  {/* Subreddits searched */}
-                  <p className="text-gray-600 text-xs mt-3 text-center">
-                    Searched: r/sneakers • r/Sneakerheads • r/SneakerDeals • r/streetwear
+
+                  {/* Social Media Impact Card */}
+                  {prediction.socialMedia && (
+                    <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
+                      <h3 className="text-white font-semibold mb-4">Social Media Impact</h3>
+                      
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="bg-gradient-to-r from-orange-500/10 to-pink-500/10 rounded-xl p-4 border border-orange-500/20 text-center">
+                          <p className="text-gray-500 text-xs mb-1">Social Score</p>
+                          <p className="text-orange-400 font-bold text-2xl">{Math.round(prediction.socialMedia.combinedScore)}<span className="text-sm text-gray-500">/100</span></p>
+                        </div>
+                        <div className={`rounded-xl p-4 border text-center ${
+                          prediction.socialMedia.adjustmentPercent >= 0 
+                            ? 'bg-green-500/10 border-green-500/20' 
+                            : 'bg-red-500/10 border-red-500/20'
+                        }`}>
+                          <p className="text-gray-500 text-xs mb-1">Price Impact</p>
+                          <p className={`font-bold text-2xl ${
+                            prediction.socialMedia.adjustmentPercent >= 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {prediction.socialMedia.adjustmentPercent >= 0 ? '↑' : '↓'}{Math.abs(prediction.socialMedia.adjustmentPercent).toFixed(1)}%
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Google Trends */}
+                      {prediction.socialMedia.googleTrends && (
+                        <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 rounded-xl p-4 border border-cyan-500/20">
+                          <div className="flex items-center gap-2 mb-3">
+                            <svg className="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                            </svg>
+                            <span className="text-cyan-300 text-sm font-medium">Google Trends</span>
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-gray-500 text-xs">Interest Level</p>
+                              <p className="text-white font-bold">{prediction.socialMedia.googleTrends.current_interest} / 100</p>
+                            </div>
+                            <span className={`text-sm font-medium px-3 py-1 rounded-lg ${
+                              prediction.socialMedia.googleTrends.trend_direction === 'rising' 
+                                ? 'bg-green-500/20 text-green-400' 
+                                : prediction.socialMedia.googleTrends.trend_direction === 'falling'
+                                ? 'bg-red-500/20 text-red-400'
+                                : 'bg-gray-500/20 text-gray-400'
+                            }`}>
+                              {prediction.socialMedia.googleTrends.trend_direction === 'rising' ? '📈 Rising' : 
+                               prediction.socialMedia.googleTrends.trend_direction === 'falling' ? '📉 Falling' : 
+                               '➡️ Stable'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Factors Analyzed - Compact Footer */}
+            {prediction?.factorsConsidered && prediction.factorsConsidered.length > 0 && (
+              <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-4">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <p className="text-gray-400 text-sm">
+                    Powered by <span className="text-indigo-400 font-medium">Driplytics AI</span>
+                    {prediction.processingTime && <span className="text-gray-500"> • {prediction.processingTime.toFixed(2)}s</span>}
                   </p>
-                </div>
-              )}
-              
-              {/* Google Trends */}
-              {prediction.socialMedia.googleTrends && (
-                <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 rounded-xl p-4 border border-cyan-500/20">
-                  <div className="flex items-center gap-2 mb-3">
-                    <svg className="w-5 h-5 text-cyan-400" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    <span className="text-cyan-300 font-medium">Google Trends</span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <p className="text-gray-500 text-xs">Current Interest</p>
-                      <p className="text-white font-bold text-lg">{prediction.socialMedia.googleTrends.current_interest}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 text-xs">Average</p>
-                      <p className="text-cyan-400 font-bold text-lg">{prediction.socialMedia.googleTrends.avg_interest}</p>
-                    </div>
-                  </div>
-                  
-                  <div className={`mt-3 px-3 py-2 rounded-lg text-center font-medium ${
-                    prediction.socialMedia.googleTrends.trend_direction === 'rising' 
-                      ? 'bg-green-500/20 text-green-400' 
-                      : prediction.socialMedia.googleTrends.trend_direction === 'falling'
-                      ? 'bg-red-500/20 text-red-400'
-                      : 'bg-gray-500/20 text-gray-400'
-                  }`}>
-                    {prediction.socialMedia.googleTrends.trend_direction === 'rising' ? '📈 Trending Up' : 
-                     prediction.socialMedia.googleTrends.trend_direction === 'falling' ? '📉 Trending Down' : 
-                     '➡️ Stable'}
+                  <div className="flex flex-wrap gap-2">
+                    {prediction.factorsConsidered.slice(0, 4).map((factor, idx) => (
+                      <span key={idx} className="text-xs text-gray-400 bg-white/10 px-2 py-1 rounded-full">
+                        {factor}
+                      </span>
+                    ))}
                   </div>
                 </div>
-              )}
-            </div>
-            
-            {/* Models Info */}
-            <div className="mt-6 text-center text-gray-400 text-sm">
-              <p>
-                Prediction Method: <span className="text-orange-400">Time Series + Linear Regression + Social Media</span>
-              </p>
-              {prediction.modelsUsed && (
-                <p className="text-xs text-gray-500 mt-1">
-                  {prediction.modelsUsed.join(' • ')}
-                </p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
-        </div>
       </div>
     </Layout>
   );
