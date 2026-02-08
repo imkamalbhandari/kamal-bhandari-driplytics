@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
-import { authAPI } from '../services/api';
+import { authAPI, favoritesAPI } from '../services/api';
 
 function Profile() {
   const navigate = useNavigate();
@@ -27,6 +27,13 @@ function Profile() {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [stats, setStats] = useState([
+    { label: 'Favorites', value: '0' },
+    { label: 'Searches', value: '0' },
+    { label: 'Predictions', value: '0' },
+    { label: 'Member Since', value: '-' },
+  ]);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   // 2FA States
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
@@ -41,19 +48,33 @@ function Profile() {
   const [disablePassword, setDisablePassword] = useState('');
   const [disableCode, setDisableCode] = useState(['', '', '', '', '', '']);
 
-  // Fetch 2FA status on mount
+  // Fetch 2FA status and profile stats on mount
   useEffect(() => {
-    const fetch2FAStatus = async () => {
+    const fetchProfileData = async () => {
       try {
-        const response = await authAPI.get2FAStatus();
-        if (response.success) {
-          setTwoFactorEnabled(response.twoFactorEnabled);
+        // Fetch 2FA status
+        const twoFAResponse = await authAPI.get2FAStatus();
+        if (twoFAResponse.success) {
+          setTwoFactorEnabled(twoFAResponse.twoFactorEnabled);
+        }
+
+        // Fetch profile stats
+        const profileResponse = await authAPI.getProfile();
+        if (profileResponse.success && profileResponse.stats) {
+          setStats([
+            { label: 'Favorites', value: profileResponse.stats.favorites?.toString() || '0' },
+            { label: 'Searches', value: profileResponse.stats.searches?.toString() || '0' },
+            { label: 'Predictions', value: profileResponse.stats.predictions?.toString() || '0' },
+            { label: 'Member Since', value: profileResponse.stats.memberSince || '-' },
+          ]);
         }
       } catch (error) {
-        console.error('Failed to fetch 2FA status:', error);
+        console.error('Failed to fetch profile data:', error);
+      } finally {
+        setStatsLoading(false);
       }
     };
-    fetch2FAStatus();
+    fetchProfileData();
   }, []);
 
   const handleChange = (e) => {
@@ -268,13 +289,6 @@ function Profile() {
     }
   };
 
-  const stats = [
-    { label: 'Favorites', value: '24' },
-    { label: 'Searches', value: '156' },
-    { label: 'Predictions', value: '48' },
-    { label: 'Member Since', value: 'Dec 2025' },
-  ];
-
   return (
     <Layout requireAuth>
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -296,8 +310,17 @@ function Profile() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/10">
             {stats.map((stat, index) => (
               <div key={index} className="text-center">
-                <p className="text-2xl font-bold text-white">{stat.value}</p>
-                <p className="text-gray-400 text-sm">{stat.label}</p>
+                {statsLoading ? (
+                  <div className="animate-pulse">
+                    <div className="h-8 bg-white/10 rounded w-12 mx-auto mb-1"></div>
+                    <div className="h-4 bg-white/10 rounded w-16 mx-auto"></div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold text-white">{stat.value}</p>
+                    <p className="text-gray-400 text-sm">{stat.label}</p>
+                  </>
+                )}
               </div>
             ))}
           </div>

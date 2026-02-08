@@ -3,7 +3,7 @@ Driplytics - Live Social Data Collection
 Collects real-time data from:
 - Google Trends (search interest + related queries)
 - Reddit (public JSON API - no auth needed)
-- YouTube (public data via search)
+
 
 For real-time hype/sentiment analysis.
 """

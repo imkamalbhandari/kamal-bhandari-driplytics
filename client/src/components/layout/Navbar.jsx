@@ -5,6 +5,7 @@ function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   
   const user = (() => {
     const userData = localStorage.getItem('user');
@@ -14,7 +15,8 @@ function Navbar() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    navigate('/login');
+    setShowLogoutModal(false);
+    navigate('/');
   };
 
   const isActive = (path) => location.pathname === path;
@@ -108,7 +110,7 @@ function Navbar() {
                   <span className="text-white font-medium hidden sm:block">{user.username}</span>
                 </Link>
                 <button
-                  onClick={handleLogout}
+                  onClick={() => setShowLogoutModal(true)}
                   className="px-4 py-2 text-gray-300 hover:text-white hover:bg-red-500/20 hover:border-red-500/30 rounded-lg transition-all text-sm font-medium border border-transparent"
                 >
                   Logout
@@ -171,6 +173,58 @@ function Navbar() {
           </div>
         )}
       </div>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/70 backdrop-blur-md"
+            onClick={() => setShowLogoutModal(false)}
+          ></div>
+          
+          {/* Modal */}
+          <div className="relative bg-gradient-to-b from-gray-800 to-gray-900 border border-white/20 rounded-3xl p-8 max-w-md w-full shadow-2xl animate-scale-in">
+            {/* Close button */}
+            <button
+              onClick={() => setShowLogoutModal(false)}
+              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-all"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="text-center">
+              {/* Icon */}
+              <div className="w-20 h-20 bg-gradient-to-br from-red-500/30 to-orange-500/30 rounded-full flex items-center justify-center mx-auto mb-5 ring-4 ring-red-500/20">
+                <svg className="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </div>
+              
+              <h3 className="text-2xl font-bold text-white mb-3">Leaving So Soon?</h3>
+              <p className="text-gray-400 mb-8 text-base">Are you sure you want to logout? You'll need to login again to access your dashboard.</p>
+              
+              {/* Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => setShowLogoutModal(false)}
+                  className="flex-1 px-6 py-3.5 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-all font-semibold border border-white/10 hover:border-white/20"
+                >
+                  Stay Logged In
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="flex-1 px-6 py-3.5 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-xl hover:from-red-700 hover:to-red-600 transition-all font-semibold shadow-lg shadow-red-500/30 hover:shadow-red-500/40"
+                >
+                  Yes, Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

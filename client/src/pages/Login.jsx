@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { authAPI } from '../services/api';
 
 function Login() {
+  const location = useLocation();
+  const successMessage = location.state?.message;
+  
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -310,6 +313,16 @@ function Login() {
             Welcome Back
           </h2>
           
+          {/* Success Message */}
+          {successMessage && (
+            <div className="mb-4 p-4 bg-green-50 border-l-4 border-green-500 text-green-700 rounded-r-lg text-sm animate-fade-in flex items-center gap-2">
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="font-medium">{successMessage}</p>
+            </div>
+          )}
+
           {/* Error Message */}
           {error && (
             <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-lg text-sm animate-fade-in flex items-center gap-2">
@@ -333,7 +346,7 @@ function Login() {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className={`w-full px-4 py-3.5 border-2 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all ${
+                className={`w-full px-4 py-3.5 border-2 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-gray-900 ${
                   emailError ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'
                 }`}
                 placeholder="you@example.com"
@@ -369,7 +382,7 @@ function Login() {
                   value={formData.password}
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all bg-white pr-12 hover:border-gray-300"
+                  className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all bg-white pr-12 hover:border-gray-300 text-gray-900"
                   placeholder="Enter your password"
                 />
                 <button

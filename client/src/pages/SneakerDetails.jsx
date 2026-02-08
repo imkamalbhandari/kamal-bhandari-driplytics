@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
-import { sneakerAPI, favoritesAPI, authAPI, paymentAPI } from '../services/api';
+import { sneakerAPI, favoritesAPI, authAPI } from '../services/api';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -38,7 +38,6 @@ function SneakerDetails() {
   const [hypeScore, setHypeScore] = useState(null);
   const [, setLoading] = useState(true);
   const [priceHistory, setPriceHistory] = useState(null);
-  const [predictionStatus, setPredictionStatus] = useState(null);
   const [, setForecast] = useState([]);
   const [predictionLoading, setPredictionLoading] = useState(false);
   const [showPrediction, setShowPrediction] = useState(false);
@@ -168,43 +167,8 @@ function SneakerDetails() {
     }
   };
 
-  // Check prediction limit before predicting
-  const checkPredictionLimit = async () => {
-    try {
-      const response = await paymentAPI.checkPrediction();
-      setPredictionStatus(response);
-      return response;
-    } catch (error) {
-      console.error('Error checking prediction limit:', error);
-      // If server is down, don't allow prediction - enforce limit strictly
-      return { canPredict: false, remaining: 0, error: 'Unable to verify prediction limit' };
-    }
-  };
-
   // Handle Predict Price button click - Uses Social Media + Time Series + Linear Regression
   const handlePredictPrice = async () => {
-    // Check prediction limit first - must succeed
-    const status = await checkPredictionLimit();
-    
-    if (!status.canPredict) {
-      // Show subscription required modal
-      setPredictionStatus(status);
-      return;
-    }
-    
-    // Record prediction usage FIRST before making prediction
-    try {
-      const usageResponse = await paymentAPI.usePrediction();
-      if (!usageResponse.success) {
-        setPredictionStatus({ canPredict: false, remaining: 0, requiresSubscription: true });
-        return;
-      }
-    } catch (e) {
-      console.error('Could not record prediction usage:', e);
-      setPredictionStatus({ canPredict: false, remaining: 0, error: 'Failed to record prediction' });
-      return;
-    }
-    
     setPredictionLoading(true);
     setShowPrediction(true);
     
@@ -613,54 +577,16 @@ function SneakerDetails() {
                 </div>
               </div>
 
-              {/* Prediction Limit Status */}
-              {predictionStatus && !predictionStatus.canPredict && (
-                <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <svg className="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <div className="flex-1">
-                      <p className="text-yellow-400 font-medium">Free Limit Reached</p>
-                      <p className="text-gray-400 text-sm">You've used all 5 free predictions this month.</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => navigate('/subscription')}
-                    className="w-full mt-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-lg hover:from-indigo-500 hover:to-purple-500 transition-all"
-                  >
-                    Upgrade to Premium - Unlimited Predictions
-                  </button>
-                </div>
-              )}
-
-              {/* Remaining Predictions Counter */}
-              {predictionStatus && predictionStatus.canPredict && predictionStatus.remaining !== -1 && (
-                <div className="mt-4 flex items-center justify-center gap-2 text-sm">
-                  <span className="text-gray-400">Free predictions remaining:</span>
-                  <span className={`font-bold ${predictionStatus.remaining <= 2 ? 'text-yellow-400' : 'text-green-400'}`}>
-                    {predictionStatus.remaining} / 5
-                  </span>
-                </div>
-              )}
-
               {/* PREDICT PRICE BUTTON */}
               <button
                 onClick={handlePredictPrice}
-                disabled={predictionLoading || (predictionStatus && !predictionStatus.canPredict)}
+                disabled={predictionLoading}
                 className="w-full mt-4 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-lg rounded-xl transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
               >
                 {predictionLoading ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
                     Analyzing Social Media & Trends...
-                  </>
-                ) : predictionStatus && !predictionStatus.canPredict ? (
-                  <>
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                    Subscription Required
                   </>
                 ) : (
                   <>

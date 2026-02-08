@@ -241,6 +241,13 @@
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
+  /* Ensure form inputs have visible text on light backgrounds */
+  input:not([type="checkbox"]):not([type="radio"]), 
+  select, 
+  textarea {
+    color: #111827;
+  }
+
   input:focus, select:focus, textarea:focus {
     transform: scale(1.01);
   }

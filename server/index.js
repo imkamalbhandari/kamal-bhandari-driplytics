@@ -58,10 +58,6 @@ app.use('/api/sneakers', sneakerRoutes);
 const favoritesRoutes = require('./routes/favorites');
 app.use('/api/favorites', favoritesRoutes);
 
-// Payment routes (Khalti integration)
-const paymentRoutes = require('./routes/payments');
-app.use('/api/payments', paymentRoutes);
-
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

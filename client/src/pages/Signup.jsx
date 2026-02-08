@@ -108,9 +108,8 @@ function Signup() {
       );
       
       if (response.success) {
-        localStorage.setItem('token', response.token);
-        localStorage.setItem('user', JSON.stringify(response.user));
-        navigate('/dashboard');
+        // Redirect to login page with success message
+        navigate('/login', { state: { message: 'Registration successful! Please login to continue.' } });
       } else {
         setError(response.message || 'Registration failed');
       }
@@ -198,7 +197,7 @@ function Signup() {
                 onChange={handleChange}
                 required
                 minLength={3}
-                className={`w-full px-4 py-3.5 border-2 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all ${
+                className={`w-full px-4 py-3.5 border-2 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-gray-900 ${
                   errors.username ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'
                 }`}
                 placeholder="Choose a username"
@@ -225,7 +224,7 @@ function Signup() {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className={`w-full px-4 py-3.5 border-2 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all ${
+                className={`w-full px-4 py-3.5 border-2 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-gray-900 ${
                   errors.email ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'
                 }`}
                 placeholder="you@example.com"
@@ -254,7 +253,7 @@ function Signup() {
                   onChange={handleChange}
                   required
                   minLength={6}
-                  className={`w-full px-4 py-3.5 border-2 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all pr-12 ${
+                  className={`w-full px-4 py-3.5 border-2 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all pr-12 text-gray-900 ${
                     errors.password ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'
                   }`}
                   placeholder="Create a password"
@@ -310,7 +309,7 @@ function Signup() {
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   required
-                  className={`w-full px-4 py-3.5 border-2 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all pr-12 ${
+                  className={`w-full px-4 py-3.5 border-2 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all pr-12 text-gray-900 ${
                     errors.confirmPassword ? 'border-red-300 bg-red-50' : formData.confirmPassword && formData.confirmPassword === formData.password ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white hover:border-gray-300'
                   }`}
                   placeholder="Confirm your password"
