@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -132,6 +132,22 @@ export const authAPI = {
   // Change password
   changePassword: async (currentPassword, newPassword) => {
     const response = await api.put('/auth/change-password', { currentPassword, newPassword });
+    return response.data;
+  },
+
+  // Upload profile picture
+  uploadProfilePicture: async (file) => {
+    const formData = new FormData();
+    formData.append('profilePicture', file);
+    const response = await api.post('/auth/profile/picture', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  },
+
+  // Remove profile picture
+  removeProfilePicture: async () => {
+    const response = await api.delete('/auth/profile/picture');
     return response.data;
   },
 
@@ -371,6 +387,25 @@ export const sneakerAPI = {
     return response.data;
   },
 
+  // Get BEST price prediction using ensemble AI models
+  predictBestPrice: async (sneakerData) => {
+    const response = await api.post('/sneakers/predict-best-price', sneakerData);
+    return response.data;
+  },
+
+  // Get QUICK best price prediction (ML-only)
+  predictBestPriceQuick: async (sneakerData) => {
+    const response = await api.post('/sneakers/predict-best-price/quick', sneakerData);
+    return response.data;
+  },
+
+  // Get BATCH best price predictions for multiple sneakers
+  predictBestPriceBatch: async (sneakers) => {
+    const payload = Array.isArray(sneakers) ? { sneakers } : sneakers;
+    const response = await api.post('/sneakers/predict-best-price/batch', payload);
+    return response.data;
+  },
+
   // ==================== LIVE DATA ENDPOINTS ====================
 
   // Get LIVE data from Google Trends + Reddit for a sneaker
@@ -422,6 +457,239 @@ export const sneakerAPI = {
    */
   predictSocialPrice: async (sneakerData) => {
     const response = await api.post('/sneakers/predict-social', sneakerData);
+    return response.data;
+  },
+};
+
+// Listings API - Trade/Marketplace
+export const listingsAPI = {
+  // Get all active listings (marketplace)
+  getAll: async (filters = {}) => {
+    const response = await api.get('/listings', { params: filters });
+    return response.data;
+  },
+
+  // Get user's own listings
+  getMyListings: async () => {
+    const response = await api.get('/listings/my');
+    return response.data;
+  },
+
+  // Get user's purchases
+  getPurchases: async () => {
+    const response = await api.get('/listings/purchases');
+    return response.data;
+  },
+
+  // Get single listing
+  getById: async (id) => {
+    const response = await api.get(`/listings/${id}`);
+    return response.data;
+  },
+
+  // Create new listing
+  create: async (listingData) => {
+    const response = await api.post('/listings', listingData);
+    return response.data;
+  },
+
+  // Update listing
+  update: async (id, listingData) => {
+    const response = await api.put(`/listings/${id}`, listingData);
+    return response.data;
+  },
+
+  // Delete/Cancel listing
+  delete: async (id) => {
+    const response = await api.delete(`/listings/${id}`);
+    return response.data;
+  },
+
+  // Buy a listing
+  buy: async (id) => {
+    const response = await api.post(`/listings/${id}/buy`);
+    return response.data;
+  },
+
+  // Get marketplace stats
+  getStats: async () => {
+    const response = await api.get('/listings/stats/overview');
+    return response.data;
+  },
+};
+
+// ========== Chat API ==========
+export const chatAPI = {
+  // Get all conversations
+  getConversations: async () => {
+    const response = await api.get('/chat/conversations');
+    return response.data;
+  },
+
+  // Get messages for a conversation
+  getMessages: async (conversationId, page = 1, limit = 50) => {
+    const response = await api.get(`/chat/messages/${conversationId}`, {
+      params: { page, limit }
+    });
+    return response.data;
+  },
+
+  // Send a message
+  sendMessage: async (receiverId, content, listingId = null) => {
+    const response = await api.post('/chat/messages', {
+      receiverId,
+      content,
+      listingId
+    });
+    return response.data;
+  },
+
+  // Start or get a conversation
+  startConversation: async (receiverId, listingId = null) => {
+    const response = await api.post('/chat/start', {
+      receiverId,
+      listingId
+    });
+    return response.data;
+  },
+
+  // Mark messages as read
+  markAsRead: async (conversationId) => {
+    const response = await api.put(`/chat/read/${conversationId}`);
+    return response.data;
+  },
+
+  // Get unread count
+  getUnreadCount: async () => {
+    const response = await api.get('/chat/unread');
+    return response.data;
+  },
+
+  // Delete a conversation
+  deleteConversation: async (conversationId) => {
+    const response = await api.delete(`/chat/conversations/${conversationId}`);
+    return response.data;
+  }
+};
+
+// Admin API
+export const adminAPI = {
+  getStats: async () => {
+    const response = await api.get('/admin/stats');
+    return response.data;
+  },
+
+  getUsers: async (search = '') => {
+    const response = await api.get('/admin/users', { params: { search } });
+    return response.data;
+  },
+
+  getUserListings: async (userId) => {
+    const response = await api.get(`/admin/users/${userId}/listings`);
+    return response.data;
+  },
+
+  toggleAdmin: async (userId) => {
+    const response = await api.put(`/admin/users/${userId}/toggle-admin`);
+    return response.data;
+  },
+
+  deleteUser: async (userId) => {
+    const response = await api.delete(`/admin/users/${userId}`);
+    return response.data;
+  },
+
+  getListings: async (status = 'all', search = '') => {
+    const response = await api.get('/admin/listings', { params: { status, search } });
+    return response.data;
+  },
+
+  updateListingStatus: async (listingId, status) => {
+    const response = await api.put(`/admin/listings/${listingId}/status`, { status });
+    return response.data;
+  },
+
+  deleteListing: async (listingId) => {
+    const response = await api.delete(`/admin/listings/${listingId}`);
+    return response.data;
+  }
+};
+
+// ==================== Payments API (Khalti) ====================
+export const paymentAPI = {
+  getPlans: async () => {
+    const response = await api.get('/payments/plans');
+    return response.data;
+  },
+
+  getStatus: async () => {
+    const response = await api.get('/payments/status');
+    return response.data;
+  },
+
+  /** Check if user can make a prediction (free limit 5/month). Returns { canPredict, remaining, requiresSubscription }. */
+  checkPrediction: async () => {
+    const response = await api.post('/payments/check-prediction');
+    return response.data;
+  },
+
+  /** Record a prediction usage (increments count). Returns { remaining }. */
+  usePrediction: async () => {
+    const response = await api.post('/payments/use-prediction');
+    return response.data;
+  },
+
+  initiatePayment: async (planType) => {
+    const response = await api.post('/payments/initiate', { planType });
+    return response.data;
+  },
+
+  verifyPayment: async (paymentData) => {
+    const response = await api.post('/payments/verify', paymentData);
+    return response.data;
+  },
+
+  getHistory: async () => {
+    const response = await api.get('/payments/history');
+    return response.data;
+  },
+};
+
+// ==================== Alerts API ====================
+export const alertsAPI = {
+  // Get all alerts for current user
+  getAll: async () => {
+    const response = await api.get('/alerts');
+    return response.data;
+  },
+
+  // Create new alert
+  create: async (alertData) => {
+    const response = await api.post('/alerts', alertData);
+    return response.data;
+  },
+
+  // Update alert
+  update: async (id, alertData) => {
+    const response = await api.put(`/alerts/${id}`, alertData);
+    return response.data;
+  },
+
+  // Toggle alert enabled/disabled
+  toggle: async (id) => {
+    const response = await api.put(`/alerts/${id}/toggle`);
+    return response.data;
+  },
+
+  // Delete alert
+  delete: async (id) => {
+    const response = await api.delete(`/alerts/${id}`);
+    return response.data;
+  },
+
+  // Manually check alerts (get fresh predictions)
+  check: async () => {
+    const response = await api.post('/alerts/check');
     return response.data;
   },
 };

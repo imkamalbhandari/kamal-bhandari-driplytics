@@ -23,6 +23,16 @@ const userSchema = new mongoose.Schema({
     required: [true, 'Password is required'],
     minlength: [6, 'Password must be at least 6 characters']
   },
+  // Profile picture
+  profilePicture: {
+    type: String,
+    default: null
+  },
+  // Admin flag
+  isAdmin: {
+    type: Boolean,
+    default: false
+  },
   // Two-Factor Authentication
   twoFactorSecret: {
     type: String,
@@ -116,9 +126,9 @@ userSchema.methods.canMakeFreePrediction = async function() {
   return this.freePredictionsUsed < FREE_LIMIT;
 };
 
-// Method to increment prediction count
-userSchema.methods.incrementPredictionCount = async function() {
-  this.freePredictionsUsed += 1;
+// Method to increment prediction count (by 1 or more for batch)
+userSchema.methods.incrementPredictionCount = async function(count = 1) {
+  this.freePredictionsUsed = (this.freePredictionsUsed || 0) + Math.max(1, count);
   await this.save();
 };
 

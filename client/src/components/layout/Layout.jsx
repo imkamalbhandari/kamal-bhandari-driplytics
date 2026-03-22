@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom';
 import Navbar from './Navbar';
 import Footer from './Footer';
 
-function Layout({ children, requireAuth = false }) {
+function Layout({ children, requireAuth = false, adminAllowed = false }) {
   const user = (() => {
     const userData = localStorage.getItem('user');
     return userData ? JSON.parse(userData) : null;
@@ -10,6 +10,11 @@ function Layout({ children, requireAuth = false }) {
 
   if (requireAuth && !user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Redirect admin users away from regular user pages to admin panel
+  if (requireAuth && user?.isAdmin && !adminAllowed) {
+    return <Navigate to="/admin" replace />;
   }
 
   return (

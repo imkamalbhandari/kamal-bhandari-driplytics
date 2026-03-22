@@ -76,17 +76,20 @@ def predict():
     Returns predicted sale price based on the StockX dataset model.
     """
     try:
+        if not models or 'rf_model' not in models or 'gb_model' not in models:
+            return jsonify({'error': 'Prediction models are not loaded. Run train_model.py first.'}), 503
+
         data = request.get_json()
         
         if not data:
             return jsonify({'error': 'No data provided'}), 400
         
         # Extract features
-        brand = data.get('brand', 'Yeezy').strip()
-        retail_price = float(data.get('retail_price', 220))
-        release_date = data.get('release_date', datetime.now().strftime('%Y-%m-%d'))
-        shoe_size = float(data.get('shoe_size', 10))
-        region = data.get('region', 'California')
+        brand = str(data.get('brand') or 'Yeezy').strip() or 'Yeezy'
+        retail_price = float(data.get('retail_price') or 220)
+        release_date = str(data.get('release_date') or datetime.now().strftime('%Y-%m-%d'))
+        shoe_size = float(data.get('shoe_size') or 10)
+        region = str(data.get('region') or 'California').strip() or 'California'
         
         # Parse release date
         try:
@@ -438,7 +441,7 @@ def get_cached_trends():
 @app.route('/sneakers/search', methods=['GET'])
 def search_sneakers():
     """
-    Search sneakers from StockX dataset.
+    Search sneakers from StockX dataset AND admin-uploaded datasets.
     
     Query params:
     - name: Search by sneaker name (partial match)
@@ -447,19 +450,74 @@ def search_sneakers():
     """
     try:
         from image_service import get_sneaker_image_url
+        import glob
         
         name = request.args.get('name', '')
         brand = request.args.get('brand', '')
         limit = int(request.args.get('limit', 50))
         
+        datasets_dir = os.path.join(os.path.dirname(__file__), 'datasets')
+        
         # Load the StockX dataset
-        data_path = os.path.join(os.path.dirname(__file__), 'datasets', 'stockx_complete.csv')
+        data_path = os.path.join(datasets_dir, 'stockx_complete.csv')
         df = pd.read_csv(data_path)
         
         # Clean price columns
         df['Sale_Price'] = df['Sale Price'].replace(r'[\$,]', '', regex=True).astype(float)
         df['Retail_Price'] = df['Retail Price'].replace(r'[\$,]', '', regex=True).astype(float)
         df['Brand'] = df['Brand'].str.strip()
+        
+        # Also load admin-uploaded datasets
+        admin_files = sorted(glob.glob(os.path.join(datasets_dir, 'admin_upload_*.csv')))
+        for admin_file in admin_files:
+            try:
+                adf = pd.read_csv(admin_file)
+                # Normalize columns
+                col_map = {}
+                for col in adf.columns:
+                    cl = col.strip().lower().replace('_', ' ')
+                    if cl in ['sneaker name', 'name', 'sneaker', 'shoe name', 'product name']:
+                        col_map[col] = 'Sneaker Name'
+                    elif cl in ['brand', 'brand name']:
+                        col_map[col] = 'Brand'
+                    elif cl in ['retail price', 'retail', 'price', 'msrp']:
+                        col_map[col] = 'Retail Price'
+                    elif cl in ['sale price', 'resale price', 'resale', 'sold price', 'selling price']:
+                        col_map[col] = 'Sale Price'
+                    elif cl in ['release date', 'release', 'released']:
+                        col_map[col] = 'Release Date'
+                    elif cl in ['shoe size', 'size', 'us size']:
+                        col_map[col] = 'Shoe Size'
+                    elif cl in ['buyer region', 'region', 'location', 'state']:
+                        col_map[col] = 'Buyer Region'
+                adf = adf.rename(columns=col_map)
+                
+                if 'Sneaker Name' in adf.columns and 'Brand' in adf.columns:
+                    # Clean price columns in admin data
+                    if 'Retail Price' in adf.columns:
+                        adf['Retail_Price'] = adf['Retail Price'].astype(str).str.replace(r'[\$,]', '', regex=True)
+                        adf['Retail_Price'] = pd.to_numeric(adf['Retail_Price'], errors='coerce')
+                    else:
+                        adf['Retail_Price'] = 0
+                    
+                    if 'Sale Price' in adf.columns:
+                        adf['Sale_Price'] = adf['Sale Price'].astype(str).str.replace(r'[\$,]', '', regex=True)
+                        adf['Sale_Price'] = pd.to_numeric(adf['Sale_Price'], errors='coerce')
+                    else:
+                        # Use retail price as fallback for sale price
+                        adf['Sale_Price'] = adf['Retail_Price']
+                    
+                    adf['Brand'] = adf['Brand'].astype(str).str.strip()
+                    if 'Release Date' not in adf.columns:
+                        adf['Release Date'] = ''
+                    if 'local_image_path' not in adf.columns:
+                        adf['local_image_path'] = ''
+                    
+                    # Keep only needed columns and append
+                    admin_subset = adf[['Sneaker Name', 'Brand', 'Sale_Price', 'Retail_Price', 'Release Date', 'local_image_path']].copy()
+                    df = pd.concat([df, admin_subset], ignore_index=True)
+            except Exception as e:
+                print(f"  Warning: Could not load admin dataset {admin_file}: {e}")
         
         # Apply filters
         if name:
@@ -1511,6 +1569,219 @@ def get_all_models_info():
         return jsonify({'error': str(e)}), 500
 
 
+# ==================== ADMIN DATASET PROCESSING ====================
+
+@app.route('/admin/process-dataset', methods=['POST'])
+def process_dataset():
+    """
+    Process an uploaded CSV dataset of sneaker data and return predictions for each row.
+    Expects a CSV file with columns: Sneaker Name, Brand, Retail Price, Release Date, Shoe Size, Buyer Region
+    Also accepts: Sale Price (optional, for comparison)
+    """
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        if not file.filename.lower().endswith('.csv'):
+            return jsonify({'error': 'Only CSV files are supported'}), 400
+
+        # Read the CSV
+        import io
+        stream = io.StringIO(file.stream.read().decode('utf-8'))
+        df = pd.read_csv(stream)
+
+        print(f"\n[Admin Dataset] Processing uploaded file: {file.filename}")
+        print(f"  Rows: {len(df)}, Columns: {df.columns.tolist()}")
+
+        # Normalize column names (case-insensitive matching)
+        col_map = {}
+        for col in df.columns:
+            cl = col.strip().lower().replace('_', ' ')
+            if cl in ['sneaker name', 'name', 'sneaker', 'shoe name', 'product name']:
+                col_map[col] = 'Sneaker Name'
+            elif cl in ['brand', 'brand name']:
+                col_map[col] = 'Brand'
+            elif cl in ['retail price', 'retail', 'price', 'msrp']:
+                col_map[col] = 'Retail Price'
+            elif cl in ['sale price', 'resale price', 'resale', 'sold price', 'selling price']:
+                col_map[col] = 'Sale Price'
+            elif cl in ['release date', 'release', 'released']:
+                col_map[col] = 'Release Date'
+            elif cl in ['shoe size', 'size', 'us size']:
+                col_map[col] = 'Shoe Size'
+            elif cl in ['buyer region', 'region', 'location', 'state']:
+                col_map[col] = 'Buyer Region'
+        
+        df = df.rename(columns=col_map)
+
+        # Validate required columns
+        required = ['Sneaker Name', 'Brand', 'Retail Price']
+        missing = [c for c in required if c not in df.columns]
+        if missing:
+            return jsonify({
+                'error': f'Missing required columns: {", ".join(missing)}',
+                'found_columns': df.columns.tolist(),
+                'expected': ['Sneaker Name', 'Brand', 'Retail Price', 'Release Date (optional)', 'Shoe Size (optional)', 'Buyer Region (optional)', 'Sale Price (optional)']
+            }), 400
+
+        # Clean price columns
+        for price_col in ['Retail Price', 'Sale Price']:
+            if price_col in df.columns:
+                df[price_col] = df[price_col].astype(str).str.replace(r'[\$,]', '', regex=True)
+                df[price_col] = pd.to_numeric(df[price_col], errors='coerce')
+
+        # Set defaults
+        if 'Shoe Size' not in df.columns:
+            df['Shoe Size'] = 10.0
+        if 'Buyer Region' not in df.columns:
+            df['Buyer Region'] = 'California'
+        if 'Release Date' not in df.columns:
+            df['Release Date'] = datetime.now().strftime('%m/%d/%y')
+
+        df['Shoe Size'] = pd.to_numeric(df['Shoe Size'], errors='coerce').fillna(10.0)
+        df['Brand'] = df['Brand'].astype(str).str.strip()
+        df = df.dropna(subset=['Retail Price'])
+        df = df[df['Retail Price'] > 0]
+
+        if len(df) == 0:
+            return jsonify({'error': 'No valid rows after cleaning'}), 400
+
+        # Process predictions
+        results = []
+        has_models = len(models) > 0
+
+        for idx, row in df.iterrows():
+            sneaker_name = str(row.get('Sneaker Name', 'Unknown'))
+            brand = str(row.get('Brand', 'Unknown')).strip()
+            retail_price = float(row['Retail Price'])
+            shoe_size = float(row.get('Shoe Size', 10.0))
+            region = str(row.get('Buyer Region', 'California'))
+
+            # Parse release date
+            release_date_str = str(row.get('Release Date', ''))
+            try:
+                release_dt = pd.to_datetime(release_date_str)
+            except:
+                release_dt = datetime.now()
+
+            days_since_release = max(0, (datetime.now() - release_dt).days)
+
+            predicted_price = None
+            confidence = 0.0
+            recommendation = 'N/A'
+
+            if has_models:
+                try:
+                    # Encode brand
+                    try:
+                        brand_encoded = models['brand_encoder'].transform([brand])[0]
+                    except:
+                        brand_encoded = 1
+
+                    # Encode region
+                    try:
+                        region_encoded = models['region_encoder'].transform([region])[0]
+                    except:
+                        region_encoded = len(models['region_encoder'].classes_) // 2
+
+                    features = np.array([[
+                        brand_encoded,
+                        region_encoded,
+                        retail_price,
+                        shoe_size,
+                        days_since_release,
+                        release_dt.year,
+                        release_dt.month,
+                        datetime.now().month,
+                        datetime.now().weekday()
+                    ]])
+
+                    rf_pred = models['rf_model'].predict(features)[0]
+                    gb_pred = models['gb_model'].predict(features)[0]
+                    predicted_price = round(rf_pred * 0.6 + gb_pred * 0.4, 2)
+
+                    pred_std = np.std([rf_pred, gb_pred])
+                    pred_mean = np.mean([rf_pred, gb_pred])
+                    confidence = round(max(0.7, min(0.95, 1 - (pred_std / pred_mean) if pred_mean > 0 else 0.85)), 2)
+
+                    premium_pct = ((predicted_price - retail_price) / retail_price) * 100
+                    if premium_pct > 50:
+                        recommendation = 'Strong Buy'
+                    elif premium_pct > 20:
+                        recommendation = 'Buy'
+                    elif premium_pct > 0:
+                        recommendation = 'Hold'
+                    elif premium_pct > -10:
+                        recommendation = 'Sell'
+                    else:
+                        recommendation = 'Avoid'
+                except Exception as e:
+                    print(f"  Prediction error for {sneaker_name}: {e}")
+
+            result_row = {
+                'sneakerName': sneaker_name,
+                'brand': brand,
+                'retailPrice': retail_price,
+                'shoeSize': shoe_size,
+                'region': region,
+                'releaseDate': release_dt.strftime('%Y-%m-%d') if release_dt else None,
+                'predictedPrice': predicted_price,
+                'confidence': confidence,
+                'recommendation': recommendation,
+                'pricePremium': round(predicted_price - retail_price, 2) if predicted_price else None,
+                'premiumPercent': round(((predicted_price - retail_price) / retail_price) * 100, 2) if predicted_price else None,
+            }
+
+            # Include actual sale price if available for comparison
+            if 'Sale Price' in df.columns and pd.notna(row.get('Sale Price')):
+                actual = float(row['Sale Price'])
+                result_row['actualPrice'] = actual
+                if predicted_price:
+                    result_row['predictionError'] = round(abs(predicted_price - actual), 2)
+                    result_row['errorPercent'] = round(abs(predicted_price - actual) / actual * 100, 2)
+
+            results.append(result_row)
+
+        # Summary statistics
+        predicted_prices = [r['predictedPrice'] for r in results if r['predictedPrice']]
+        summary = {
+            'totalRows': len(results),
+            'predictedRows': len(predicted_prices),
+            'avgPredictedPrice': round(np.mean(predicted_prices), 2) if predicted_prices else 0,
+            'minPredictedPrice': round(min(predicted_prices), 2) if predicted_prices else 0,
+            'maxPredictedPrice': round(max(predicted_prices), 2) if predicted_prices else 0,
+            'avgRetailPrice': round(df['Retail Price'].mean(), 2),
+            'uniqueBrands': df['Brand'].nunique(),
+            'brands': df['Brand'].value_counts().to_dict(),
+        }
+
+        if any('actualPrice' in r for r in results):
+            errors = [r['errorPercent'] for r in results if 'errorPercent' in r]
+            summary['avgErrorPercent'] = round(np.mean(errors), 2) if errors else None
+            summary['modelAccuracy'] = round(100 - np.mean(errors), 2) if errors else None
+
+        # Save to datasets folder for future reference
+        save_path = os.path.join(os.path.dirname(__file__), 'datasets', f'admin_upload_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv')
+        df.to_csv(save_path, index=False)
+        print(f"  Saved uploaded dataset to {save_path}")
+
+        return jsonify({
+            'success': True,
+            'summary': summary,
+            'results': results,
+            'filename': file.filename
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     print("Starting Driplytics ML API Server...")
     print("\nEndpoints:")
@@ -1543,4 +1814,6 @@ if __name__ == '__main__':
     print("  POST /predict-best-price/quick - Fast prediction (ML models only)")
     print("  POST /predict-best-price/batch - Batch prediction for multiple sneakers")
     print("  GET  /models/info              - Get all models information")
+    print("\n  === ADMIN DATASET ENDPOINTS ===")
+    print("  POST /admin/process-dataset    - Upload & process CSV dataset with predictions")
     app.run(host='0.0.0.0', port=5002, debug=True)

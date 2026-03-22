@@ -12,7 +12,11 @@ import Trends from './pages/Trends';
 import Compare from './pages/Compare';
 import Alerts from './pages/Alerts';
 import Favorites from './pages/Favorites';
+import Trade from './pages/Trade';
+import Chat from './pages/Chat';
 import Profile from './pages/Profile';
+import Subscription from './pages/Subscription';
+import Admin from './pages/Admin';
 import './App.css';
 
 function App() {
@@ -32,7 +36,12 @@ function App() {
         <Route path="/compare" element={<Compare />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/favorites" element={<Favorites />} />
+        <Route path="/trade" element={<Trade />} />
+        <Route path="/chat" element={<Chat />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/subscription" element={<Subscription />} />
+        <Route path="/subscription/verify" element={<Subscription />} />
+        <Route path="/admin" element={<Admin />} />
       </Routes>
     </Router>
   );

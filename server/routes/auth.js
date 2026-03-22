@@ -3,9 +3,43 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const speakeasy = require('speakeasy');
 const QRCode = require('qrcode');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const User = require('../models/User');
 const OTP = require('../models/OTP');
 const { sendOTPEmail } = require('../services/emailService');
+
+// Multer config for profile picture uploads
+const uploadsDir = path.join(__dirname, '..', 'uploads', 'profiles');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `profile-${req.userId}-${uniqueSuffix}${path.extname(file.originalname)}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (extname && mimetype) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files (jpeg, jpg, png, gif, webp) are allowed'));
+    }
+  }
+});
 
 // JWT Secret (in production, use environment variable)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
@@ -141,6 +175,8 @@ router.post('/login', async (req, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
+        profilePicture: user.profilePicture || null,
+        isAdmin: user.isAdmin || false,
         twoFactorEnabled: user.twoFactorEnabled || false
       }
     });
@@ -371,16 +407,55 @@ router.get('/profile', authenticateToken, async (req, res) => {
 
     // Get favorites count
     const Favorite = require('../models/Favorite');
-    const favoritesCount = await Favorite.countDocuments({ userId: req.userId });
+    const Alert = require('../models/Alert');
+    const Listing = require('../models/Listing');
+    const Message = require('../models/Message');
+
+    const [favoritesCount, alertsCount, listingsCount, messagesCount] = await Promise.all([
+      Favorite.countDocuments({ userId: req.userId }),
+      Alert.countDocuments({ userId: req.userId }),
+      Listing.countDocuments({ sellerId: req.userId }),
+      Message.countDocuments({ senderId: req.userId })
+    ]);
 
     // Calculate member since
     const memberSince = user.createdAt 
       ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
       : 'Dec 2025';
 
+    // Calculate days since joining
+    const daysSinceJoining = user.createdAt
+      ? Math.floor((Date.now() - new Date(user.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+
     // Get real search and prediction counts
-    const searchCount = (user.searchHistory || []).length;
-    const predictionCount = (user.predictionHistory || []).length;
+    const searchHistory = user.searchHistory || [];
+    const predictionHistory = user.predictionHistory || [];
+    const searchCount = searchHistory.length;
+    const predictionCount = predictionHistory.length;
+
+    // Recent activity (last 10 items, merged and sorted)
+    const recentSearches = searchHistory.slice(0, 10).map(s => ({
+      type: 'search',
+      query: s.query,
+      resultCount: s.resultCount,
+      timestamp: s.timestamp
+    }));
+    const recentPredictions = predictionHistory.slice(0, 10).map(p => ({
+      type: 'prediction',
+      sneakerName: p.sneakerName,
+      predictedPrice: p.predictedPrice,
+      confidence: p.confidence,
+      timestamp: p.timestamp
+    }));
+    const recentActivity = [...recentSearches, ...recentPredictions]
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, 15);
+
+    // Subscription info
+    const subscriptionType = user.subscription?.type || 'free';
+    const subscriptionStatus = user.subscription?.status || 'active';
+    const remainingPredictions = user.getRemainingFreePredictions();
 
     res.json({
       success: true,
@@ -388,6 +463,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
+        profilePicture: user.profilePicture || null,
         createdAt: user.createdAt,
         twoFactorEnabled: user.twoFactorEnabled || false
       },
@@ -395,8 +471,18 @@ router.get('/profile', authenticateToken, async (req, res) => {
         favorites: favoritesCount,
         searches: searchCount,
         predictions: predictionCount,
-        memberSince: memberSince
-      }
+        alerts: alertsCount,
+        listings: listingsCount,
+        messages: messagesCount,
+        memberSince: memberSince,
+        daysSinceJoining: daysSinceJoining
+      },
+      subscription: {
+        type: subscriptionType,
+        status: subscriptionStatus,
+        remainingPredictions: remainingPredictions
+      },
+      recentActivity: recentActivity
     });
   } catch (error) {
     console.error('Get profile error:', error);
@@ -453,7 +539,8 @@ router.put('/profile', authenticateToken, async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        profilePicture: user.profilePicture || null
       }
     });
   } catch (error) {
@@ -463,6 +550,84 @@ router.put('/profile', authenticateToken, async (req, res) => {
       message: 'Server error updating profile',
       error: error.message
     });
+  }
+});
+
+// Upload/Change profile picture
+router.post('/profile/picture', authenticateToken, (req, res) => {
+  upload.single('profilePicture')(req, res, async (err) => {
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ success: false, message: 'File size cannot exceed 5MB' });
+        }
+        return res.status(400).json({ success: false, message: err.message });
+      }
+      return res.status(400).json({ success: false, message: err.message });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    try {
+      const user = await User.findById(req.userId);
+      if (!user) {
+        // Clean up uploaded file
+        fs.unlinkSync(req.file.path);
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+
+      // Delete old profile picture if exists
+      if (user.profilePicture) {
+        const oldPath = path.join(__dirname, '..', user.profilePicture);
+        if (fs.existsSync(oldPath)) {
+          fs.unlinkSync(oldPath);
+        }
+      }
+
+      // Save new profile picture path (relative to server root)
+      const profilePicturePath = `/uploads/profiles/${req.file.filename}`;
+      user.profilePicture = profilePicturePath;
+      await user.save();
+
+      res.json({
+        success: true,
+        message: 'Profile picture updated successfully',
+        profilePicture: profilePicturePath
+      });
+    } catch (error) {
+      console.error('Profile picture upload error:', error);
+      // Clean up uploaded file on error
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      res.status(500).json({ success: false, message: 'Failed to update profile picture' });
+    }
+  });
+});
+
+// Remove profile picture
+router.delete('/profile/picture', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.profilePicture) {
+      const oldPath = path.join(__dirname, '..', user.profilePicture);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+      user.profilePicture = null;
+      await user.save();
+    }
+
+    res.json({ success: true, message: 'Profile picture removed successfully' });
+  } catch (error) {
+    console.error('Remove profile picture error:', error);
+    res.status(500).json({ success: false, message: 'Failed to remove profile picture' });
   }
 });
 
@@ -753,7 +918,8 @@ router.post('/2fa/validate', async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        profilePicture: user.profilePicture || null
       }
     });
   } catch (error) {

@@ -95,11 +95,11 @@ class EnsemblePricePredictor:
     def prepare_features(self, data: Dict[str, Any]) -> np.ndarray:
         """Prepare feature vector for ML models."""
         # Extract data
-        brand = data.get('brand', 'Yeezy').strip()
-        retail_price = float(data.get('retail_price', 220))
-        release_date = data.get('release_date', datetime.now().strftime('%Y-%m-%d'))
-        shoe_size = float(data.get('shoe_size', 10))
-        region = data.get('region', 'California')
+        brand = str(data.get('brand') or 'Yeezy').strip() or 'Yeezy'
+        retail_price = float(data.get('retail_price') or 220)
+        release_date = str(data.get('release_date') or datetime.now().strftime('%Y-%m-%d'))
+        shoe_size = float(data.get('shoe_size') or 10)
+        region = str(data.get('region') or 'California').strip() or 'California'
         
         # Parse release date
         try:

@@ -1,9 +1,32 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const User = require('../models/User');
+const { authenticateToken } = require('../middleware/auth');
 
 // ML Service URL - runs on port 5002
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5002';
+
+/** Check if user can make predictions (free: 5/month, subscribed: unlimited). Returns { allowed, user, remaining } or sends 403. */
+async function checkPredictionQuota(req, res, cost = 1) {
+  const user = await User.findById(req.userId);
+  if (!user) {
+    res.status(404).json({ success: false, error: 'User not found', requiresSubscription: false });
+    return null;
+  }
+  const canPredict = await user.canMakeFreePrediction();
+  const remaining = user.getRemainingFreePredictions();
+  if (!canPredict || (remaining !== -1 && remaining < cost)) {
+    res.status(403).json({
+      success: false,
+      error: 'You have used your 5 free predictions. Please subscribe to continue.',
+      requiresSubscription: true,
+      remaining: remaining === -1 ? 'unlimited' : remaining
+    });
+    return null;
+  }
+  return { user, remaining };
+}
 
 /**
  * Search sneakers
@@ -35,14 +58,19 @@ router.get('/search', async (req, res) => {
  */
 router.post('/predict', async (req, res) => {
   try {
-    const { brand, gender, retail_price, release_date, volatility } = req.body;
-    
+    const payload = {
+      brand: req.body.brand ?? req.body.Brand,
+      retail_price: req.body.retail_price ?? req.body.retailPrice,
+      release_date: req.body.release_date ?? req.body.releaseDate,
+      shoe_size: req.body.shoe_size ?? req.body.shoeSize,
+      region: req.body.region ?? req.body.buyerRegion,
+      sneaker_name: req.body.sneaker_name ?? req.body.sneakerName ?? req.body.name,
+      gender: req.body.gender,
+      volatility: req.body.volatility
+    };
+
     const response = await axios.post(`${ML_SERVICE_URL}/predict`, {
-      brand,
-      gender,
-      retail_price,
-      release_date,
-      volatility
+      ...payload
     });
     
     res.json(response.data);
@@ -51,7 +79,7 @@ router.post('/predict', async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: 'Failed to get prediction',
-      message: error.message 
+      message: error.response?.data?.error || error.message 
     });
   }
 });
@@ -591,14 +619,18 @@ router.post('/live/hype-score', async (req, res) => {
 /**
  * Get price prediction based on social media presence
  * Uses: Time Series Forecasting + Linear Regression + Social Media (Reddit + Google Trends)
+ * Requires auth. Free: 5 predictions/month; then must subscribe.
  * POST /api/sneakers/predict-social
  * Body: { sneaker_name, brand, retail_price, release_date, shoe_size, region }
  */
-router.post('/predict-social', async (req, res) => {
+router.post('/predict-social', authenticateToken, async (req, res) => {
   try {
+    const quota = await checkPredictionQuota(req, res, 1);
+    if (!quota) return;
     const response = await axios.post(`${ML_SERVICE_URL}/predict-social`, req.body, {
       timeout: 30000 // 30 second timeout
     });
+    await quota.user.incrementPredictionCount(1);
     res.json(response.data);
   } catch (error) {
     console.error('Social prediction error:', error.message);
@@ -638,11 +670,14 @@ router.post('/predict-social', async (req, res) => {
  * 6. Google Trends
  * 7. Groq LLM Market Analysis
  */
-router.post('/predict-best-price', async (req, res) => {
+router.post('/predict-best-price', authenticateToken, async (req, res) => {
   try {
+    const quota = await checkPredictionQuota(req, res, 1);
+    if (!quota) return;
     const response = await axios.post(`${ML_SERVICE_URL}/predict-best-price`, req.body, {
       timeout: 30000 // 30 second timeout for comprehensive prediction
     });
+    await quota.user.incrementPredictionCount(1);
     res.json(response.data);
   } catch (error) {
     console.error('Best price prediction error:', error.message);
@@ -659,9 +694,12 @@ router.post('/predict-best-price', async (req, res) => {
  * POST /api/sneakers/predict-best-price/quick
  * Body: { sneaker_name, brand, retail_price, release_date, shoe_size, region }
  */
-router.post('/predict-best-price/quick', async (req, res) => {
+router.post('/predict-best-price/quick', authenticateToken, async (req, res) => {
   try {
+    const quota = await checkPredictionQuota(req, res, 1);
+    if (!quota) return;
     const response = await axios.post(`${ML_SERVICE_URL}/predict-best-price/quick`, req.body);
+    await quota.user.incrementPredictionCount(1);
     res.json(response.data);
   } catch (error) {
     console.error('Quick prediction error:', error.message);
@@ -683,11 +721,15 @@ router.post('/predict-best-price/quick', async (req, res) => {
  *   ]
  * }
  */
-router.post('/predict-best-price/batch', async (req, res) => {
+router.post('/predict-best-price/batch', authenticateToken, async (req, res) => {
   try {
+    const cost = Math.max(1, Array.isArray(req.body.sneakers) ? req.body.sneakers.length : 1);
+    const quota = await checkPredictionQuota(req, res, cost);
+    if (!quota) return;
     const response = await axios.post(`${ML_SERVICE_URL}/predict-best-price/batch`, req.body, {
       timeout: 60000 // 60 second timeout for batch
     });
+    await quota.user.incrementPredictionCount(cost);
     res.json(response.data);
   } catch (error) {
     console.error('Batch prediction error:', error.message);

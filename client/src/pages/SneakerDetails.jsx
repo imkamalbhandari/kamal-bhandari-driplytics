@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
-import { sneakerAPI, favoritesAPI, authAPI } from '../services/api';
+import { sneakerAPI, favoritesAPI, authAPI, paymentAPI } from '../services/api';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -41,8 +41,23 @@ function SneakerDetails() {
   const [, setForecast] = useState([]);
   const [predictionLoading, setPredictionLoading] = useState(false);
   const [showPrediction, setShowPrediction] = useState(false);
+  const [predictionStatus, setPredictionStatus] = useState(null); // { remaining, unlimited } from getStatus
+  const [subscriptionRequired, setSubscriptionRequired] = useState(false); // whether paywall modal is shown
   const [, setLiveData] = useState(null);
   const [liveDataLoading] = useState(false);
+
+  // Fetch prediction status on mount
+  useEffect(() => {
+    const fetchPredictionStatus = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await paymentAPI.getStatus();
+        if (res.success) setPredictionStatus(res);
+      } catch { /* not logged in or server down */ }
+    };
+    fetchPredictionStatus();
+  }, []);
 
   // Get sneaker data from location state
   const sneakerFromState = location.state?.sneaker;
@@ -169,10 +184,32 @@ function SneakerDetails() {
 
   // Handle Predict Price button click - Uses Social Media + Time Series + Linear Regression
   const handlePredictPrice = async () => {
+    setSubscriptionRequired(false);
     setPredictionLoading(true);
     setShowPrediction(true);
-    
+
     try {
+      // Check if user can make a prediction
+      const check = await paymentAPI.checkPrediction();
+      if (!check.canPredict) {
+        setSubscriptionRequired(true);
+        setPredictionLoading(false);
+        setShowPrediction(false);
+        return;
+      }
+
+      // Record the prediction usage BEFORE making the call
+      try {
+        await paymentAPI.usePrediction();
+      } catch (usageErr) {
+        if (usageErr.response?.status === 403) {
+          setSubscriptionRequired(true);
+          setPredictionLoading(false);
+          setShowPrediction(false);
+          return;
+        }
+      }
+
       // 📱 Use Social Media-Based Prediction (Time Series + Linear Regression + Social)
       const socialResponse = await sneakerAPI.predictSocialPrice({
         sneaker_name: sneaker.name,
@@ -185,12 +222,12 @@ function SneakerDetails() {
       
       // Update remaining predictions count
       try {
-        const updatedStatus = await checkPredictionLimit();
-        setPredictionStatus(updatedStatus);
+        const statusRes = await paymentAPI.getStatus();
+        if (statusRes.success) setPredictionStatus(statusRes);
       } catch {
         // Could not update prediction status
       }
-      
+
       if (socialResponse.success) {
         const pred = socialResponse.prediction;
         const rec = socialResponse.recommendation;
@@ -323,20 +360,22 @@ function SneakerDetails() {
 
     } catch (err) {
       console.error('Prediction error:', err);
-      
-      // Fallback
-      setPrediction({
-        price: Math.round(sneaker.retailPrice * 1.1),
-        confidence: 70,
-        trend: 'up',
-        trendIndicator: '↑',
-        trendLabel: 'UP',
-        trendColor: 'green',
-        changePercent: '↑ 10%',
-        isIncrease: true,
-        timeframe: '30 days',
-        recommendation: 'Hold - Analysis unavailable'
-      });
+      if (err.response?.status === 403 && err.response?.data?.requiresSubscription) {
+        setSubscriptionRequired(true);
+      } else {
+        setPrediction({
+          price: Math.round(sneaker.retailPrice * 1.1),
+          confidence: 70,
+          trend: 'up',
+          trendIndicator: '↑',
+          trendLabel: 'UP',
+          trendColor: 'green',
+          changePercent: '↑ 10%',
+          isIncrease: true,
+          timeframe: '30 days',
+          recommendation: 'Hold - Analysis unavailable'
+        });
+      }
     } finally {
       setPredictionLoading(false);
     }
@@ -593,10 +632,107 @@ function SneakerDetails() {
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
-                    📱 Predict Price (Social + AI)
+                    Predict Price (Social + AI)
                   </>
                 )}
               </button>
+
+              {/* Remaining predictions counter */}
+              {predictionStatus && !predictionStatus.predictions?.unlimited && (
+                <div className="mt-2 flex items-center justify-center gap-2">
+                  <div className="flex gap-1">
+                    {[...Array(5)].map((_, i) => (
+                      <div
+                        key={i}
+                        className={`w-2 h-2 rounded-full transition-all ${
+                          i < (predictionStatus.predictions?.remaining || 0)
+                            ? 'bg-indigo-400'
+                            : 'bg-gray-600'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-gray-400 text-xs">
+                    {predictionStatus.predictions?.remaining || 0} of 5 free predictions left
+                  </span>
+                </div>
+              )}
+              {predictionStatus?.predictions?.unlimited && (
+                <p className="mt-2 text-center text-xs text-emerald-400">
+                  ✦ Unlimited predictions ({predictionStatus.subscription?.type?.toUpperCase()} plan)
+                </p>
+              )}
+
+              {/* Subscription Paywall Modal */}
+              {subscriptionRequired && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setSubscriptionRequired(false)}>
+                  <div className="bg-gray-900 border border-white/10 rounded-2xl p-8 max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+                    {/* Lock icon */}
+                    <div className="flex justify-center mb-5">
+                      <div className="w-16 h-16 bg-amber-500/20 rounded-2xl flex items-center justify-center">
+                        <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      </div>
+                    </div>
+
+                    <h3 className="text-xl font-bold text-white text-center mb-2">Free Limit Reached</h3>
+                    <p className="text-gray-400 text-center mb-6">
+                      You've used all <span className="text-white font-semibold">5 free predictions</span> this month.
+                      Upgrade to get unlimited AI-powered price predictions.
+                    </p>
+
+                    {/* Usage bar */}
+                    <div className="mb-6">
+                      <div className="flex justify-between text-xs text-gray-500 mb-1">
+                        <span>Predictions used</span>
+                        <span className="text-amber-400">5 / 5</span>
+                      </div>
+                      <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                        <div className="w-full h-full bg-gradient-to-r from-amber-500 to-red-500 rounded-full" />
+                      </div>
+                    </div>
+
+                    {/* Plans quick comparison */}
+                    <div className="space-y-3 mb-6">
+                      <div className="flex items-center justify-between p-3 rounded-xl bg-violet-500/10 border border-violet-500/30">
+                        <div>
+                          <p className="text-white font-semibold text-sm">Premium</p>
+                          <p className="text-gray-400 text-xs">Unlimited predictions, 30 days</p>
+                        </div>
+                        <span className="text-violet-300 font-bold">रू 299</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 rounded-xl bg-purple-500/10 border border-purple-500/30">
+                        <div>
+                          <p className="text-white font-semibold text-sm">Pro</p>
+                          <p className="text-gray-400 text-xs">Unlimited + API access, 90 days</p>
+                        </div>
+                        <span className="text-purple-300 font-bold">रू 799</span>
+                      </div>
+                    </div>
+
+                    {/* CTA buttons */}
+                    <div className="flex flex-col gap-2">
+                      <Link
+                        to="/subscription"
+                        className="w-full py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold rounded-xl text-center transition-all"
+                      >
+                        Subscribe Now
+                      </Link>
+                      <button
+                        onClick={() => setSubscriptionRequired(false)}
+                        className="w-full py-3 bg-white/5 hover:bg-white/10 text-gray-400 font-medium rounded-xl transition-all"
+                      >
+                        Maybe Later
+                      </button>
+                    </div>
+
+                    <p className="text-center text-gray-600 text-xs mt-4">
+                      Resets monthly · Pay securely with Khalti
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Quick Stats */}

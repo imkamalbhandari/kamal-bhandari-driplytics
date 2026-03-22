@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { sneakerAPI } from '../services/api';
 import {
@@ -29,6 +29,7 @@ ChartJS.register(
 );
 
 function Dashboard() {
+  const navigate = useNavigate();
   const user = (() => {
     const userData = localStorage.getItem('user');
     return userData ? JSON.parse(userData) : null;

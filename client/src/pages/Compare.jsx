@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
-import { sneakerAPI } from '../services/api';
+import { sneakerAPI, paymentAPI } from '../services/api';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -30,6 +31,7 @@ function Compare() {
   const [comparing, setComparing] = useState(false);
   const [batchPredictions, setBatchPredictions] = useState(null);
   const [predictingBatch, setPredictingBatch] = useState(false);
+  const [subscriptionMessage, setSubscriptionMessage] = useState(null);
 
   // Search sneakers
   const handleSearch = async () => {
@@ -82,25 +84,42 @@ function Compare() {
     }
   };
 
-  // Batch predict prices
+  // Batch predict prices (uses prediction quota: 1 per sneaker; free limit 5/month)
   const predictAllPrices = async () => {
     if (selectedSneakers.length < 1) return;
-    
+
+    setSubscriptionMessage(null);
     setPredictingBatch(true);
     try {
+      const check = await paymentAPI.checkPrediction();
+      const need = selectedSneakers.length;
+      const remaining = check.remaining === -1 ? Infinity : (check.remaining ?? 0);
+      if (!check.canPredict || remaining < need) {
+        setSubscriptionMessage(
+          need > 1
+            ? `You need ${need} predictions but only have ${remaining} left this month. Subscribe for unlimited.`
+            : (check.message || 'You have used your 5 free predictions. Please subscribe to continue.')
+        );
+        setPredictingBatch(false);
+        return;
+      }
+
       const sneakersData = selectedSneakers.map(s => ({
         sneaker_name: s.Name,
         brand: s.Brand,
         retail_price: s.RetailPrice || 150,
         release_date: s.ReleaseDate
       }));
-      
+
       const response = await sneakerAPI.predictBestPriceBatch(sneakersData);
       if (response.success) {
         setBatchPredictions(response.predictions);
       }
     } catch (error) {
       console.error('Batch prediction error:', error);
+      if (error.response?.status === 403 && error.response?.data?.requiresSubscription) {
+        setSubscriptionMessage(error.response.data.error || 'Subscribe to get more predictions.');
+      }
     } finally {
       setPredictingBatch(false);
     }
@@ -243,6 +262,14 @@ function Compare() {
                     )}
                   </button>
                 </div>
+                {subscriptionMessage && (
+                  <div className="mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200">
+                    <p className="font-medium mb-2">{subscriptionMessage}</p>
+                    <Link to="/subscription" className="inline-flex items-center gap-2 text-amber-400 hover:text-amber-300 font-semibold">
+                      Subscribe for unlimited predictions →
+                    </Link>
+                  </div>
+                )}
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">

@@ -1,8 +1,20 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 function Home() {
   const navigate = useNavigate();
+  const [showLogoutToast, setShowLogoutToast] = useState(false);
+
+  // Check for logout success message
+  useEffect(() => {
+    if (sessionStorage.getItem('logoutSuccess')) {
+      setShowLogoutToast(true);
+      sessionStorage.removeItem('logoutSuccess');
+      // Auto-hide after 4 seconds
+      const timer = setTimeout(() => setShowLogoutToast(false), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
   
   // Check if user is logged in
   const user = (() => {
@@ -29,6 +41,31 @@ function Home() {
   // Landing page for non-logged-in users
   return (
     <div className="min-h-screen w-full flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-black relative overflow-hidden">
+      {/* Logout Success Toast */}
+      {showLogoutToast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-slide-down">
+          <div className="flex items-center gap-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-4 rounded-xl shadow-2xl shadow-green-500/30 border border-green-400/20 backdrop-blur-sm">
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-semibold text-lg">Logged Out Successfully</p>
+              <p className="text-green-100 text-sm">See you next time!</p>
+            </div>
+            <button 
+              onClick={() => setShowLogoutToast(false)}
+              className="ml-4 p-1 hover:bg-white/20 rounded-full transition-all"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Animated background elements */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-20 left-10 w-72 h-72 bg-white/5 rounded-full blur-3xl animate-float-slow"></div>

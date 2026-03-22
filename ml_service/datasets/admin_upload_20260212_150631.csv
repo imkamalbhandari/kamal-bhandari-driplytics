@@ -1,0 +1,121 @@
+Order Date,Brand,Sneaker Name,Sale Price,Retail Price,Release Date,Shoe Size,Buyer Region,local_image_path
+12/15/2019,Adidas,Adidas-UltraBoost-22-Black,505,180,07/28/2019,7.0,Illinois,datasets/sneaker_images/Adidas-UltraBoost-22-Black.jpg
+11/02/2021,Adidas,Adidas-UltraBoost-22-Black,459,200,11/02/2016,9.5,Florida,datasets/sneaker_images/Adidas-UltraBoost-22-Black.jpg
+09/24/2020,Adidas,Adidas-UltraBoost-22-Black,448,120,12/01/2021,7.0,New York,datasets/sneaker_images/Adidas-UltraBoost-22-Black.jpg
+12/14/2018,Adidas,Adidas-UltraBoost-22-Black,232,150,03/08/2022,12.0,Ohio,datasets/sneaker_images/Adidas-UltraBoost-22-Black.jpg
+03/17/2018,Adidas,Adidas-UltraBoost-22-Black,356,220,06/01/2019,8.0,Florida,datasets/sneaker_images/Adidas-UltraBoost-22-Black.jpg
+08/01/2018,Adidas,Adidas-UltraBoost-22-Black,277,220,08/20/2018,11.0,Illinois,datasets/sneaker_images/Adidas-UltraBoost-22-Black.jpg
+06/20/2022,Adidas,Adidas-UltraBoost-22-Black,535,150,03/16/2019,11.5,Florida,datasets/sneaker_images/Adidas-UltraBoost-22-Black.jpg
+06/01/2022,Adidas,Adidas-UltraBoost-22-Black,256,120,09/07/2017,7.0,Ohio,datasets/sneaker_images/Adidas-UltraBoost-22-Black.jpg
+04/15/2019,Adidas,Adidas-UltraBoost-22-Black,420,150,01/18/2022,7.0,Illinois,datasets/sneaker_images/Adidas-UltraBoost-22-Black.jpg
+07/18/2018,Adidas,Adidas-UltraBoost-22-Black,375,180,10/17/2018,7.0,Texas,datasets/sneaker_images/Adidas-UltraBoost-22-Black.jpg
+09/21/2018,Adidas,Adidas-NMD-R1-White,183,150,01/11/2018,10.0,Nevada,datasets/sneaker_images/Adidas-NMD-R1-White.jpg
+07/08/2020,Adidas,Adidas-NMD-R1-White,413,120,11/18/2020,11.5,Florida,datasets/sneaker_images/Adidas-NMD-R1-White.jpg
+04/28/2022,Adidas,Adidas-NMD-R1-White,451,150,09/19/2018,10.0,New York,datasets/sneaker_images/Adidas-NMD-R1-White.jpg
+11/23/2020,Adidas,Adidas-NMD-R1-White,278,150,04/21/2019,12.0,Texas,datasets/sneaker_images/Adidas-NMD-R1-White.jpg
+01/16/2018,Adidas,Adidas-NMD-R1-White,515,180,08/21/2016,11.0,Nevada,datasets/sneaker_images/Adidas-NMD-R1-White.jpg
+06/28/2019,Adidas,Adidas-NMD-R1-White,170,120,04/07/2020,10.0,Illinois,datasets/sneaker_images/Adidas-NMD-R1-White.jpg
+08/28/2022,Adidas,Adidas-NMD-R1-White,418,220,07/12/2021,11.0,California,datasets/sneaker_images/Adidas-NMD-R1-White.jpg
+02/09/2021,Adidas,Adidas-NMD-R1-White,269,180,12/27/2019,8.5,Nevada,datasets/sneaker_images/Adidas-NMD-R1-White.jpg
+01/26/2021,Adidas,Adidas-NMD-R1-White,563,180,09/01/2021,10.5,Nevada,datasets/sneaker_images/Adidas-NMD-R1-White.jpg
+11/20/2018,Adidas,Adidas-NMD-R1-White,428,220,02/09/2016,12.0,Ohio,datasets/sneaker_images/Adidas-NMD-R1-White.jpg
+04/14/2019,Adidas,Adidas-Superstar-Classic,360,150,08/16/2019,10.5,Illinois,datasets/sneaker_images/Adidas-Superstar-Classic.jpg
+12/01/2020,Adidas,Adidas-Superstar-Classic,129,100,10/08/2019,9.0,Texas,datasets/sneaker_images/Adidas-Superstar-Classic.jpg
+06/15/2020,Adidas,Adidas-Superstar-Classic,265,220,10/17/2021,7.0,Florida,datasets/sneaker_images/Adidas-Superstar-Classic.jpg
+06/01/2019,Adidas,Adidas-Superstar-Classic,437,100,11/06/2018,8.5,California,datasets/sneaker_images/Adidas-Superstar-Classic.jpg
+06/23/2022,Adidas,Adidas-Superstar-Classic,243,120,09/25/2017,9.0,Illinois,datasets/sneaker_images/Adidas-Superstar-Classic.jpg
+02/07/2021,Adidas,Adidas-Superstar-Classic,539,180,12/31/2019,11.0,New York,datasets/sneaker_images/Adidas-Superstar-Classic.jpg
+09/24/2018,Adidas,Adidas-Superstar-Classic,297,180,09/03/2018,8.5,Ohio,datasets/sneaker_images/Adidas-Superstar-Classic.jpg
+10/09/2021,Adidas,Adidas-Superstar-Classic,452,100,09/21/2018,8.0,California,datasets/sneaker_images/Adidas-Superstar-Classic.jpg
+04/18/2022,Adidas,Adidas-Superstar-Classic,327,180,07/27/2019,10.0,Illinois,datasets/sneaker_images/Adidas-Superstar-Classic.jpg
+07/12/2022,Adidas,Adidas-Superstar-Classic,360,120,02/21/2021,9.5,Texas,datasets/sneaker_images/Adidas-Superstar-Classic.jpg
+09/21/2021,Adidas,Adidas-Forum-Low-Blue,333,100,05/01/2016,7.0,Illinois,datasets/sneaker_images/Adidas-Forum-Low-Blue.jpg
+01/31/2019,Adidas,Adidas-Forum-Low-Blue,484,220,09/01/2017,9.0,Ohio,datasets/sneaker_images/Adidas-Forum-Low-Blue.jpg
+02/21/2022,Adidas,Adidas-Forum-Low-Blue,295,150,05/07/2016,9.0,Nevada,datasets/sneaker_images/Adidas-Forum-Low-Blue.jpg
+06/06/2022,Adidas,Adidas-Forum-Low-Blue,472,220,04/29/2020,9.5,Nevada,datasets/sneaker_images/Adidas-Forum-Low-Blue.jpg
+01/26/2020,Adidas,Adidas-Forum-Low-Blue,410,200,09/24/2016,12.0,California,datasets/sneaker_images/Adidas-Forum-Low-Blue.jpg
+01/02/2022,Adidas,Adidas-Forum-Low-Blue,277,100,06/14/2021,10.5,California,datasets/sneaker_images/Adidas-Forum-Low-Blue.jpg
+05/23/2020,Adidas,Adidas-Forum-Low-Blue,191,150,11/28/2021,8.5,New York,datasets/sneaker_images/Adidas-Forum-Low-Blue.jpg
+10/04/2019,Adidas,Adidas-Forum-Low-Blue,545,180,04/07/2018,11.5,California,datasets/sneaker_images/Adidas-Forum-Low-Blue.jpg
+04/27/2022,Adidas,Adidas-Forum-Low-Blue,220,120,11/10/2020,12.0,California,datasets/sneaker_images/Adidas-Forum-Low-Blue.jpg
+09/03/2021,Adidas,Adidas-Forum-Low-Blue,370,150,05/22/2022,12.0,Ohio,datasets/sneaker_images/Adidas-Forum-Low-Blue.jpg
+06/07/2018,Nike,Nike-Air-Force-1-White,533,220,03/30/2019,11.5,Texas,datasets/sneaker_images/Nike-Air-Force-1-White.jpg
+08/12/2022,Nike,Nike-Air-Force-1-White,480,180,10/03/2019,10.0,Nevada,datasets/sneaker_images/Nike-Air-Force-1-White.jpg
+06/04/2022,Nike,Nike-Air-Force-1-White,561,180,04/06/2020,8.5,Texas,datasets/sneaker_images/Nike-Air-Force-1-White.jpg
+10/01/2022,Nike,Nike-Air-Force-1-White,410,100,12/28/2016,9.5,California,datasets/sneaker_images/Nike-Air-Force-1-White.jpg
+10/24/2019,Nike,Nike-Air-Force-1-White,513,220,10/23/2018,10.0,Illinois,datasets/sneaker_images/Nike-Air-Force-1-White.jpg
+05/25/2019,Nike,Nike-Air-Force-1-White,318,120,03/19/2017,9.0,California,datasets/sneaker_images/Nike-Air-Force-1-White.jpg
+09/20/2020,Nike,Nike-Air-Force-1-White,447,120,06/10/2021,9.5,Florida,datasets/sneaker_images/Nike-Air-Force-1-White.jpg
+01/15/2022,Nike,Nike-Air-Force-1-White,210,100,04/08/2018,9.5,Nevada,datasets/sneaker_images/Nike-Air-Force-1-White.jpg
+10/23/2020,Nike,Nike-Air-Force-1-White,359,100,03/21/2022,9.5,California,datasets/sneaker_images/Nike-Air-Force-1-White.jpg
+06/06/2019,Nike,Nike-Air-Force-1-White,421,200,03/25/2022,8.5,Florida,datasets/sneaker_images/Nike-Air-Force-1-White.jpg
+07/06/2019,Nike,Nike-Air-Jordan-1-High-OG,460,100,01/04/2021,11.0,New York,datasets/sneaker_images/Nike-Air-Jordan-1-High-OG.jpg
+09/02/2021,Nike,Nike-Air-Jordan-1-High-OG,547,180,10/20/2021,8.0,Texas,datasets/sneaker_images/Nike-Air-Jordan-1-High-OG.jpg
+05/14/2020,Nike,Nike-Air-Jordan-1-High-OG,391,120,09/23/2017,12.0,Texas,datasets/sneaker_images/Nike-Air-Jordan-1-High-OG.jpg
+08/16/2019,Nike,Nike-Air-Jordan-1-High-OG,279,220,03/03/2019,10.5,Ohio,datasets/sneaker_images/Nike-Air-Jordan-1-High-OG.jpg
+10/11/2020,Nike,Nike-Air-Jordan-1-High-OG,571,220,10/17/2021,10.0,Texas,datasets/sneaker_images/Nike-Air-Jordan-1-High-OG.jpg
+07/02/2020,Nike,Nike-Air-Jordan-1-High-OG,251,220,03/22/2019,9.5,Nevada,datasets/sneaker_images/Nike-Air-Jordan-1-High-OG.jpg
+11/13/2021,Nike,Nike-Air-Jordan-1-High-OG,276,220,09/09/2016,7.0,California,datasets/sneaker_images/Nike-Air-Jordan-1-High-OG.jpg
+04/13/2020,Nike,Nike-Air-Jordan-1-High-OG,163,100,06/10/2018,8.0,Ohio,datasets/sneaker_images/Nike-Air-Jordan-1-High-OG.jpg
+04/21/2019,Nike,Nike-Air-Jordan-1-High-OG,543,150,10/30/2017,10.0,New York,datasets/sneaker_images/Nike-Air-Jordan-1-High-OG.jpg
+06/06/2019,Nike,Nike-Air-Jordan-1-High-OG,251,120,06/17/2018,8.5,California,datasets/sneaker_images/Nike-Air-Jordan-1-High-OG.jpg
+03/01/2020,Nike,Nike-Dunk-Low-Panda,549,220,01/23/2017,12.0,California,datasets/sneaker_images/Nike-Dunk-Low-Panda.jpg
+12/13/2018,Nike,Nike-Dunk-Low-Panda,429,120,02/10/2017,11.0,Ohio,datasets/sneaker_images/Nike-Dunk-Low-Panda.jpg
+06/06/2020,Nike,Nike-Dunk-Low-Panda,422,200,09/05/2021,8.5,Illinois,datasets/sneaker_images/Nike-Dunk-Low-Panda.jpg
+03/21/2022,Nike,Nike-Dunk-Low-Panda,520,150,07/12/2017,12.0,Ohio,datasets/sneaker_images/Nike-Dunk-Low-Panda.jpg
+05/05/2021,Nike,Nike-Dunk-Low-Panda,369,100,04/09/2017,9.5,Nevada,datasets/sneaker_images/Nike-Dunk-Low-Panda.jpg
+09/04/2020,Nike,Nike-Dunk-Low-Panda,355,200,10/23/2016,9.5,Illinois,datasets/sneaker_images/Nike-Dunk-Low-Panda.jpg
+12/20/2018,Nike,Nike-Dunk-Low-Panda,412,200,08/20/2018,7.0,California,datasets/sneaker_images/Nike-Dunk-Low-Panda.jpg
+09/07/2020,Nike,Nike-Dunk-Low-Panda,490,120,09/16/2021,9.0,Texas,datasets/sneaker_images/Nike-Dunk-Low-Panda.jpg
+09/14/2022,Nike,Nike-Dunk-Low-Panda,455,180,10/05/2019,12.0,Ohio,datasets/sneaker_images/Nike-Dunk-Low-Panda.jpg
+01/31/2021,Nike,Nike-Dunk-Low-Panda,172,100,09/17/2021,8.0,Texas,datasets/sneaker_images/Nike-Dunk-Low-Panda.jpg
+10/12/2019,Nike,Nike-Air-Max-90-Infrared,251,220,08/14/2016,8.5,Ohio,datasets/sneaker_images/Nike-Air-Max-90-Infrared.jpg
+10/31/2022,Nike,Nike-Air-Max-90-Infrared,281,100,12/04/2020,10.0,Illinois,datasets/sneaker_images/Nike-Air-Max-90-Infrared.jpg
+06/24/2018,Nike,Nike-Air-Max-90-Infrared,159,100,05/10/2021,11.5,Texas,datasets/sneaker_images/Nike-Air-Max-90-Infrared.jpg
+12/10/2018,Nike,Nike-Air-Max-90-Infrared,389,150,03/09/2017,8.5,Texas,datasets/sneaker_images/Nike-Air-Max-90-Infrared.jpg
+05/15/2022,Nike,Nike-Air-Max-90-Infrared,386,200,04/02/2021,11.5,California,datasets/sneaker_images/Nike-Air-Max-90-Infrared.jpg
+09/19/2019,Nike,Nike-Air-Max-90-Infrared,523,150,03/27/2022,9.0,Nevada,datasets/sneaker_images/Nike-Air-Max-90-Infrared.jpg
+04/26/2019,Nike,Nike-Air-Max-90-Infrared,173,150,07/08/2017,9.0,New York,datasets/sneaker_images/Nike-Air-Max-90-Infrared.jpg
+10/13/2020,Nike,Nike-Air-Max-90-Infrared,574,220,11/26/2021,12.0,New York,datasets/sneaker_images/Nike-Air-Max-90-Infrared.jpg
+11/18/2021,Nike,Nike-Air-Max-90-Infrared,389,100,12/23/2017,8.0,Nevada,datasets/sneaker_images/Nike-Air-Max-90-Infrared.jpg
+10/24/2022,Nike,Nike-Air-Max-90-Infrared,283,220,02/11/2016,10.5,Florida,datasets/sneaker_images/Nike-Air-Max-90-Infrared.jpg
+12/18/2019,Puma,Puma-RS-X-Red,404,200,03/20/2018,11.5,Florida,datasets/sneaker_images/Puma-RS-X-Red.jpg
+12/19/2019,Puma,Puma-RS-X-Red,620,220,06/15/2021,9.5,California,datasets/sneaker_images/Puma-RS-X-Red.jpg
+07/28/2022,Puma,Puma-RS-X-Red,128,100,08/23/2016,8.5,Illinois,datasets/sneaker_images/Puma-RS-X-Red.jpg
+02/10/2018,Puma,Puma-RS-X-Red,191,100,06/25/2018,8.0,Texas,datasets/sneaker_images/Puma-RS-X-Red.jpg
+09/17/2018,Puma,Puma-RS-X-Red,455,200,01/15/2018,10.5,New York,datasets/sneaker_images/Puma-RS-X-Red.jpg
+06/18/2019,Puma,Puma-RS-X-Red,451,200,09/10/2020,11.0,Nevada,datasets/sneaker_images/Puma-RS-X-Red.jpg
+04/02/2020,Puma,Puma-RS-X-Red,226,180,02/04/2017,8.5,Nevada,datasets/sneaker_images/Puma-RS-X-Red.jpg
+04/06/2020,Puma,Puma-RS-X-Red,378,100,10/28/2020,8.5,Nevada,datasets/sneaker_images/Puma-RS-X-Red.jpg
+07/01/2021,Puma,Puma-RS-X-Red,562,200,06/01/2017,9.5,Florida,datasets/sneaker_images/Puma-RS-X-Red.jpg
+07/31/2020,Puma,Puma-RS-X-Red,206,120,10/01/2021,10.5,Illinois,datasets/sneaker_images/Puma-RS-X-Red.jpg
+03/31/2018,Puma,Puma-Suede-Classic-Black,384,120,07/03/2020,8.0,New York,datasets/sneaker_images/Puma-Suede-Classic-Black.jpg
+05/17/2020,Puma,Puma-Suede-Classic-Black,183,100,12/19/2019,11.5,Ohio,datasets/sneaker_images/Puma-Suede-Classic-Black.jpg
+02/26/2021,Puma,Puma-Suede-Classic-Black,194,120,06/06/2016,9.0,New York,datasets/sneaker_images/Puma-Suede-Classic-Black.jpg
+10/14/2021,Puma,Puma-Suede-Classic-Black,126,100,04/15/2020,11.0,Nevada,datasets/sneaker_images/Puma-Suede-Classic-Black.jpg
+05/21/2020,Puma,Puma-Suede-Classic-Black,232,120,05/09/2018,11.0,Nevada,datasets/sneaker_images/Puma-Suede-Classic-Black.jpg
+10/21/2022,Puma,Puma-Suede-Classic-Black,492,220,02/22/2017,9.5,Texas,datasets/sneaker_images/Puma-Suede-Classic-Black.jpg
+07/10/2022,Puma,Puma-Suede-Classic-Black,383,150,02/24/2017,9.5,Ohio,datasets/sneaker_images/Puma-Suede-Classic-Black.jpg
+08/29/2018,Puma,Puma-Suede-Classic-Black,596,200,10/15/2017,10.5,New York,datasets/sneaker_images/Puma-Suede-Classic-Black.jpg
+10/09/2018,Puma,Puma-Suede-Classic-Black,269,100,10/01/2017,10.0,Illinois,datasets/sneaker_images/Puma-Suede-Classic-Black.jpg
+05/23/2022,Puma,Puma-Suede-Classic-Black,458,100,05/08/2016,10.0,Illinois,datasets/sneaker_images/Puma-Suede-Classic-Black.jpg
+05/29/2019,New Balance,NewBalance-550-White-Green,316,220,02/20/2018,9.0,New York,datasets/sneaker_images/NewBalance-550-White-Green.jpg
+02/05/2019,New Balance,NewBalance-550-White-Green,397,120,12/27/2019,10.0,Ohio,datasets/sneaker_images/NewBalance-550-White-Green.jpg
+03/18/2022,New Balance,NewBalance-550-White-Green,388,120,01/21/2020,9.0,Ohio,datasets/sneaker_images/NewBalance-550-White-Green.jpg
+12/01/2021,New Balance,NewBalance-550-White-Green,399,180,04/02/2017,10.0,Nevada,datasets/sneaker_images/NewBalance-550-White-Green.jpg
+07/09/2018,New Balance,NewBalance-550-White-Green,258,120,03/16/2018,11.5,Florida,datasets/sneaker_images/NewBalance-550-White-Green.jpg
+07/06/2021,New Balance,NewBalance-550-White-Green,517,200,03/22/2018,8.0,Illinois,datasets/sneaker_images/NewBalance-550-White-Green.jpg
+02/14/2020,New Balance,NewBalance-550-White-Green,355,100,05/31/2016,8.5,New York,datasets/sneaker_images/NewBalance-550-White-Green.jpg
+06/29/2022,New Balance,NewBalance-550-White-Green,525,220,06/14/2017,8.5,New York,datasets/sneaker_images/NewBalance-550-White-Green.jpg
+10/08/2019,New Balance,NewBalance-550-White-Green,548,220,04/25/2022,8.5,Ohio,datasets/sneaker_images/NewBalance-550-White-Green.jpg
+02/11/2019,New Balance,NewBalance-550-White-Green,158,100,02/14/2019,9.5,California,datasets/sneaker_images/NewBalance-550-White-Green.jpg
+07/06/2020,New Balance,NewBalance-990v5-Grey,310,200,06/07/2021,9.5,California,datasets/sneaker_images/NewBalance-990v5-Grey.jpg
+02/27/2021,New Balance,NewBalance-990v5-Grey,291,100,03/11/2018,10.5,Florida,datasets/sneaker_images/NewBalance-990v5-Grey.jpg
+11/20/2019,New Balance,NewBalance-990v5-Grey,322,180,03/06/2018,11.5,Florida,datasets/sneaker_images/NewBalance-990v5-Grey.jpg
+08/16/2022,New Balance,NewBalance-990v5-Grey,337,180,11/11/2021,10.5,California,datasets/sneaker_images/NewBalance-990v5-Grey.jpg
+09/05/2021,New Balance,NewBalance-990v5-Grey,390,150,02/29/2016,11.5,Florida,datasets/sneaker_images/NewBalance-990v5-Grey.jpg
+04/21/2020,New Balance,NewBalance-990v5-Grey,394,200,04/18/2017,9.5,Ohio,datasets/sneaker_images/NewBalance-990v5-Grey.jpg
+02/06/2019,New Balance,NewBalance-990v5-Grey,276,180,11/29/2017,9.0,Texas,datasets/sneaker_images/NewBalance-990v5-Grey.jpg
+12/30/2018,New Balance,NewBalance-990v5-Grey,344,220,01/22/2019,9.0,Ohio,datasets/sneaker_images/NewBalance-990v5-Grey.jpg
+03/28/2022,New Balance,NewBalance-990v5-Grey,412,220,12/18/2018,8.5,Nevada,datasets/sneaker_images/NewBalance-990v5-Grey.jpg
+12/31/2018,New Balance,NewBalance-990v5-Grey,224,150,11/13/2020,8.0,California,datasets/sneaker_images/NewBalance-990v5-Grey.jpg

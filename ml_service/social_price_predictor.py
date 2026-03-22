@@ -103,8 +103,35 @@ class SocialPricePredictor:
         """Initialize and load models."""
         self.models = {}
         self.encoders = {}
+        self.feature_columns = [
+            'Brand_Encoded',
+            'Region_Encoded',
+            'Retail_Price',
+            'Shoe Size',
+            'Days_Since_Release',
+            'Release_Year',
+            'Release_Month',
+            'Order_Month',
+            'Order_DayOfWeek',
+        ]
         self.loaded = False
         self.load_models()
+
+    @staticmethod
+    def _safe_str(value: Any, default: str) -> str:
+        if value is None:
+            return default
+        value_str = str(value).strip()
+        return value_str if value_str else default
+
+    @staticmethod
+    def _safe_float(value: Any, default: float) -> float:
+        try:
+            if value is None:
+                return float(default)
+            return float(value)
+        except (TypeError, ValueError):
+            return float(default)
         
     def load_models(self):
         """
@@ -130,6 +157,9 @@ class SocialPricePredictor:
             self.encoders['brand'] = joblib.load(os.path.join(MODELS_DIR, 'brand_encoder.pkl'))
             self.encoders['region'] = joblib.load(os.path.join(MODELS_DIR, 'region_encoder.pkl'))
             self.scaler = joblib.load(os.path.join(MODELS_DIR, 'scaler.pkl'))
+            feature_columns_path = os.path.join(MODELS_DIR, 'feature_columns.pkl')
+            if os.path.exists(feature_columns_path):
+                self.feature_columns = joblib.load(feature_columns_path)
             
             # Load metadata
             self.metadata = joblib.load(os.path.join(MODELS_DIR, 'training_metadata.pkl'))
@@ -155,13 +185,13 @@ class SocialPricePredictor:
         except:
             return len(self.encoders['region'].classes_) // 2
     
-    def prepare_features(self, data: Dict[str, Any]) -> np.ndarray:
+    def prepare_features(self, data: Dict[str, Any]) -> pd.DataFrame:
         """Prepare feature vector for Linear Regression."""
-        brand = data.get('brand', 'Yeezy').strip()
-        retail_price = float(data.get('retail_price', 220))
-        release_date = data.get('release_date', datetime.now().strftime('%Y-%m-%d'))
-        shoe_size = float(data.get('shoe_size', 10))
-        region = data.get('region', 'California')
+        brand = self._safe_str(data.get('brand'), 'Yeezy')
+        retail_price = self._safe_float(data.get('retail_price'), 220)
+        release_date = self._safe_str(data.get('release_date'), datetime.now().strftime('%Y-%m-%d'))
+        shoe_size = self._safe_float(data.get('shoe_size'), 10)
+        region = self._safe_str(data.get('region'), 'California')
         
         # Parse release date
         try:
@@ -175,22 +205,24 @@ class SocialPricePredictor:
         order_date = datetime.now()
         days_since_release = max(0, (order_date - release_dt).days)
         
-        # Create feature vector
-        features = np.array([[
-            self.encode_brand(brand),
-            self.encode_region(region),
-            retail_price,
-            shoe_size,
-            days_since_release,
-            release_dt.year,
-            release_dt.month,
-            order_date.month,
-            order_date.weekday()
-        ]])
+        # Create feature vector with training column names
+        features = pd.DataFrame([{
+            'Brand_Encoded': self.encode_brand(brand),
+            'Region_Encoded': self.encode_region(region),
+            'Retail_Price': retail_price,
+            'Shoe Size': shoe_size,
+            'Days_Since_Release': days_since_release,
+            'Release_Year': release_dt.year,
+            'Release_Month': release_dt.month,
+            'Order_Month': order_date.month,
+            'Order_DayOfWeek': order_date.weekday()
+        }])
+
+        features = features.reindex(columns=self.feature_columns, fill_value=0)
         
         return features
     
-    def get_random_forest_prediction(self, features: np.ndarray, current_price: float) -> Dict[str, Any]:
+    def get_random_forest_prediction(self, features: pd.DataFrame, current_price: float) -> Dict[str, Any]:
         """Get prediction from Random Forest model (from proposal)."""
         try:
             if 'random_forest' not in self.models:
@@ -216,12 +248,13 @@ class SocialPricePredictor:
             print(f"Random Forest error: {e}")
             return None
     
-    def get_linear_regression_prediction(self, features: np.ndarray, current_price: float) -> Dict[str, Any]:
+    def get_linear_regression_prediction(self, features: pd.DataFrame, current_price: float) -> Dict[str, Any]:
         """Get prediction from Linear Regression model (from proposal)."""
         try:
             # Use linear regression with raw features (consistent with training)
             if 'linear_regression' in self.models:
-                prediction = self.models['linear_regression'].predict(features)[0]
+                scaled_features = self.scaler.transform(features)
+                prediction = self.models['linear_regression'].predict(scaled_features)[0]
                 model_name = 'Linear Regression'
             else:
                 # Fallback to simple estimate
