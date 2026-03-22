@@ -5,9 +5,69 @@ const User = require('../models/User');
 const Payment = require('../models/Payment');
 const { authenticateToken } = require('../middleware/auth');
 
-// Khalti API configuration
-const KHALTI_SECRET_KEY = process.env.KHALTI_SECRET_KEY || 'test_secret_key_dc74e0fd57cb46cd93832aee0a390234';
-const KHALTI_API_URL = 'https://khalti.com/api/v2';
+// Khalti ePayment API (docs: https://docs.khalti.com/khalti-epayment/)
+// Sandbox: https://dev.khalti.com/api/v2/ | Key from https://test-admin.khalti.com
+// Production: https://khalti.com/api/v2/ | Key from https://admin.khalti.com
+// Sandbox test: OTP 987654, Khalti IDs 9800000000–9800000005, MPIN 1111
+const rawKhaltiSecretKey = (
+  process.env.KHALTI_SECRET_KEY ||
+  process.env.KHALTI_LIVE_SECRET_KEY ||
+  process.env.KHALTI_TEST_SECRET_KEY ||
+  ''
+).trim();
+const KHALTI_SECRET_KEY = rawKhaltiSecretKey.replace(/^Key\s+/i, '').trim();
+const khaltiApiUrlFromEnv = (process.env.KHALTI_API_URL || '').trim().replace(/\/$/, '');
+
+const sandboxFlagFromEnv =
+  process.env.KHALTI_SANDBOX === 'true'
+    ? true
+    : process.env.KHALTI_SANDBOX === 'false'
+    ? false
+    : null;
+
+const sandboxFlagFromKey =
+  /^test_/i.test(KHALTI_SECRET_KEY) || /sandbox|dev/i.test(KHALTI_SECRET_KEY)
+    ? true
+    : /^live_/i.test(KHALTI_SECRET_KEY)
+    ? false
+    : null;
+
+const KHALTI_SANDBOX =
+  sandboxFlagFromEnv ?? sandboxFlagFromKey ?? process.env.NODE_ENV !== 'production';
+
+const KHALTI_API_URL =
+  khaltiApiUrlFromEnv ||
+  (KHALTI_SANDBOX ? 'https://dev.khalti.com/api/v2' : 'https://khalti.com/api/v2');
+
+const KHALTI_ALT_API_URL = KHALTI_API_URL.includes('dev.khalti.com')
+  ? 'https://khalti.com/api/v2'
+  : 'https://dev.khalti.com/api/v2';
+
+const buildKhaltiHeaders = () => ({
+  Authorization: `Key ${KHALTI_SECRET_KEY}`,
+  'Content-Type': 'application/json'
+});
+
+const shouldRetryWithAlternateUrl = (error) => {
+  return error?.response?.status === 401 && !khaltiApiUrlFromEnv;
+};
+
+const khaltiPost = async (endpoint, payload) => {
+  try {
+    return await axios.post(`${KHALTI_API_URL}${endpoint}`, payload, {
+      headers: buildKhaltiHeaders()
+    });
+  } catch (error) {
+    if (!shouldRetryWithAlternateUrl(error)) {
+      throw error;
+    }
+
+    console.warn(`Khalti 401 on ${KHALTI_API_URL}; retrying with ${KHALTI_ALT_API_URL}`);
+    return axios.post(`${KHALTI_ALT_API_URL}${endpoint}`, payload, {
+      headers: buildKhaltiHeaders()
+    });
+  }
+};
 
 // Subscription plans
 const SUBSCRIPTION_PLANS = {
@@ -42,7 +102,7 @@ router.get('/plans', (req, res) => {
  */
 router.get('/status', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId);
+    const user = await User.findById(req.userId);
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
@@ -82,7 +142,7 @@ router.get('/status', authenticateToken, async (req, res) => {
  */
 router.post('/check-prediction', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId);
+    const user = await User.findById(req.userId);
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
@@ -111,7 +171,7 @@ router.post('/check-prediction', authenticateToken, async (req, res) => {
  */
 router.post('/use-prediction', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId);
+    const user = await User.findById(req.userId);
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
@@ -140,52 +200,47 @@ router.post('/use-prediction', authenticateToken, async (req, res) => {
 
 /**
  * POST /api/payments/initiate
- * Initiate Khalti payment
+ * Initiate Khalti ePayment (Web Checkout). User is redirected to payment_url.
  */
 router.post('/initiate', authenticateToken, async (req, res) => {
   try {
+    if (!KHALTI_SECRET_KEY) {
+      return res.status(503).json({ success: false, error: 'Khalti is not configured. Set KHALTI_SECRET_KEY in .env' });
+    }
+
     const { planType } = req.body;
-    
     if (!planType || !SUBSCRIPTION_PLANS[planType]) {
       return res.status(400).json({ success: false, error: 'Invalid plan type' });
     }
 
     const plan = SUBSCRIPTION_PLANS[planType];
-    const user = await User.findById(req.user.userId);
-
+    const user = await User.findById(req.userId);
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    // Generate unique purchase order ID
     const purchaseOrderId = `DRP-${user._id}-${Date.now()}`;
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+    const amountPaisa = Math.round(plan.price * 100); // Khalti expects paisa; min 1000 (Rs 10)
+    if (amountPaisa < 1000) {
+      return res.status(400).json({ success: false, error: 'Amount must be at least Rs 10' });
+    }
 
-    // Khalti payment initiation payload
     const payload = {
-      return_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/subscription/verify`,
-      website_url: process.env.FRONTEND_URL || 'http://localhost:5173',
-      amount: plan.price * 100, // Khalti expects paisa (multiply by 100)
+      return_url: `${frontendUrl}/subscription/verify`,
+      website_url: frontendUrl,
+      amount: amountPaisa,
       purchase_order_id: purchaseOrderId,
-      purchase_order_name: `Driplytics ${plan.name} Subscription`,
+      purchase_order_name: `Driplytics ${plan.name} (${plan.duration} days)`,
       customer_info: {
-        name: user.username,
-        email: user.email
+        name: user.username || 'Customer',
+        email: user.email,
+        phone: '9800000000' // Sandbox test IDs: 9800000000–9800000005
       }
     };
 
-    // Call Khalti API to initiate payment
-    const response = await axios.post(
-      `${KHALTI_API_URL}/epayment/initiate/`,
-      payload,
-      {
-        headers: {
-          'Authorization': `Key ${KHALTI_SECRET_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    const response = await khaltiPost('/epayment/initiate/', payload);
 
-    // Create pending payment record
     const payment = new Payment({
       user: user._id,
       khaltiTransactionId: purchaseOrderId,
@@ -201,64 +256,61 @@ router.post('/initiate', authenticateToken, async (req, res) => {
       success: true,
       paymentUrl: response.data.payment_url,
       pidx: response.data.pidx,
+      expires_in: response.data.expires_in,
       purchaseOrderId
     });
-
   } catch (error) {
-    console.error('Payment initiation error:', error.response?.data || error.message);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to initiate payment',
-      details: error.response?.data || error.message
+    const details = error.response?.data;
+    console.error('Payment initiation error:', details || error.message);
+    const isKhaltiAuthError = error.response?.status === 401;
+    res.status(isKhaltiAuthError ? 401 : 500).json({
+      success: false,
+      error: isKhaltiAuthError
+        ? 'Khalti authentication failed. Check KHALTI_SECRET_KEY and KHALTI_SANDBOX in server/.env.'
+        : details?.detail || details?.amount?.[0] || 'Failed to initiate payment',
+      details: details
     });
   }
 });
 
 /**
  * POST /api/payments/verify
- * Verify Khalti payment after redirect
+ * Verify Khalti payment via lookup API after user is redirected to return_url.
+ * Only status "Completed" is treated as success (per Khalti docs).
  */
 router.post('/verify', authenticateToken, async (req, res) => {
   try {
-    const { pidx, txnId, amount, purchaseOrderId } = req.body;
-
-    if (!pidx) {
-      return res.status(400).json({ success: false, error: 'Payment ID required' });
+    if (!KHALTI_SECRET_KEY) {
+      return res.status(503).json({ success: false, error: 'Khalti is not configured' });
     }
 
-    // Verify payment with Khalti
-    const response = await axios.post(
-      `${KHALTI_API_URL}/epayment/lookup/`,
-      { pidx },
-      {
-        headers: {
-          'Authorization': `Key ${KHALTI_SECRET_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    const { pidx, status: callbackStatus } = req.body;
+    if (!pidx) {
+      return res.status(400).json({ success: false, error: 'Payment ID (pidx) required' });
+    }
 
-    const paymentData = response.data;
+    // Lookup payment with Khalti (required for confirmation per docs)
+    const lookupRes = await khaltiPost('/epayment/lookup/', { pidx });
 
-    // Find the payment record
+    const paymentData = lookupRes.data;
     const payment = await Payment.findOne({ khaltiIdx: pidx });
     if (!payment) {
       return res.status(404).json({ success: false, error: 'Payment record not found' });
     }
 
-    // Check if payment is successful
-    if (paymentData.status === 'Completed') {
-      // Update payment record
+    const status = paymentData.status;
+
+    // Only "Completed" = success (Khalti docs)
+    if (status === 'Completed') {
       payment.status = 'completed';
       payment.khaltiTransactionId = paymentData.transaction_id || pidx;
+      payment.errorMessage = undefined;
       await payment.save();
 
-      // Update user subscription
       const user = await User.findById(payment.user);
       const plan = SUBSCRIPTION_PLANS[payment.subscriptionType];
-      
       const now = new Date();
-      const endDate = new Date(now.getTime() + (plan.duration * 24 * 60 * 60 * 1000));
+      const endDate = new Date(now.getTime() + plan.duration * 24 * 60 * 60 * 1000);
 
       user.subscription = {
         type: payment.subscriptionType,
@@ -267,10 +319,10 @@ router.post('/verify', authenticateToken, async (req, res) => {
         endDate: endDate,
         khaltiTransactionId: paymentData.transaction_id || pidx
       };
-      user.freePredictionsUsed = 0; // Reset prediction count
+      user.freePredictionsUsed = 0;
       await user.save();
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Payment verified successfully',
         subscription: {
@@ -280,24 +332,38 @@ router.post('/verify', authenticateToken, async (req, res) => {
           daysRemaining: plan.duration
         }
       });
-    } else {
-      payment.status = 'failed';
-      payment.errorMessage = `Payment status: ${paymentData.status}`;
-      await payment.save();
-
-      res.status(400).json({
-        success: false,
-        error: 'Payment not completed',
-        status: paymentData.status
-      });
     }
 
+    // Failed / non-success statuses
+    payment.status = 'failed';
+    payment.errorMessage = status;
+    await payment.save();
+
+    const userFacingMessage =
+      status === 'User canceled'
+        ? 'Payment was canceled.'
+        : status === 'Expired'
+        ? 'Payment link expired. Please try again.'
+        : status === 'Pending' || status === 'Initiated'
+        ? 'Payment is still pending. Please wait or contact support.'
+        : status === 'Refunded' || status === 'Partially Refunded'
+        ? 'This payment was refunded.'
+        : `Payment not completed (${status}).`;
+
+    res.status(400).json({
+      success: false,
+      error: userFacingMessage,
+      status
+    });
   } catch (error) {
-    console.error('Payment verification error:', error.response?.data || error.message);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to verify payment',
-      details: error.response?.data || error.message
+    const details = error.response?.data;
+    const isInvalidPidx = details?.error_key === 'validation_error' || details?.detail === 'Not found.';
+    const isAuth = error.response?.status === 401;
+    console.error('Payment verification error:', details || error.message);
+    res.status(isAuth ? 401 : isInvalidPidx ? 404 : 500).json({
+      success: false,
+      error: details?.detail || 'Failed to verify payment',
+      details: details
     });
   }
 });
@@ -308,7 +374,7 @@ router.post('/verify', authenticateToken, async (req, res) => {
  */
 router.get('/history', authenticateToken, async (req, res) => {
   try {
-    const payments = await Payment.find({ user: req.user.userId })
+    const payments = await Payment.find({ user: req.userId })
       .sort({ createdAt: -1 })
       .limit(10);
 
