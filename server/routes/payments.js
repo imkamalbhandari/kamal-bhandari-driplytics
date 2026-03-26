@@ -16,6 +16,7 @@ const rawKhaltiSecretKey = (
   ''
 ).trim();
 const KHALTI_SECRET_KEY = rawKhaltiSecretKey.replace(/^Key\s+/i, '').trim();
+const hasLikelyKhaltiSecretKeyFormat = /^live_secret_key_/i.test(KHALTI_SECRET_KEY) || /^[a-f0-9]{32}$/i.test(KHALTI_SECRET_KEY);
 const khaltiApiUrlFromEnv = (process.env.KHALTI_API_URL || '').trim().replace(/\/$/, '');
 
 const sandboxFlagFromEnv =
@@ -43,30 +44,35 @@ const KHALTI_ALT_API_URL = KHALTI_API_URL.includes('dev.khalti.com')
   ? 'https://khalti.com/api/v2'
   : 'https://dev.khalti.com/api/v2';
 
-const buildKhaltiHeaders = () => ({
-  Authorization: `Key ${KHALTI_SECRET_KEY}`,
+const buildKhaltiHeaders = (authPrefix = 'Key') => ({
+  Authorization: `${authPrefix} ${KHALTI_SECRET_KEY}`,
   'Content-Type': 'application/json'
 });
 
-const shouldRetryWithAlternateUrl = (error) => {
-  return error?.response?.status === 401 && !khaltiApiUrlFromEnv;
-};
-
 const khaltiPost = async (endpoint, payload) => {
-  try {
-    return await axios.post(`${KHALTI_API_URL}${endpoint}`, payload, {
-      headers: buildKhaltiHeaders()
-    });
-  } catch (error) {
-    if (!shouldRetryWithAlternateUrl(error)) {
-      throw error;
-    }
+  const baseUrls = khaltiApiUrlFromEnv
+    ? [KHALTI_API_URL]
+    : [KHALTI_API_URL, KHALTI_ALT_API_URL];
+  const authPrefixes = ['Key', 'key'];
 
-    console.warn(`Khalti 401 on ${KHALTI_API_URL}; retrying with ${KHALTI_ALT_API_URL}`);
-    return axios.post(`${KHALTI_ALT_API_URL}${endpoint}`, payload, {
-      headers: buildKhaltiHeaders()
-    });
+  let lastError;
+
+  for (const baseUrl of baseUrls) {
+    for (const authPrefix of authPrefixes) {
+      try {
+        return await axios.post(`${baseUrl}${endpoint}`, payload, {
+          headers: buildKhaltiHeaders(authPrefix)
+        });
+      } catch (error) {
+        lastError = error;
+        if (error?.response?.status !== 401) {
+          throw error;
+        }
+      }
+    }
   }
+
+  throw lastError;
 };
 
 // Subscription plans
@@ -208,6 +214,13 @@ router.post('/initiate', authenticateToken, async (req, res) => {
       return res.status(503).json({ success: false, error: 'Khalti is not configured. Set KHALTI_SECRET_KEY in .env' });
     }
 
+    if (!hasLikelyKhaltiSecretKeyFormat) {
+      return res.status(503).json({
+        success: false,
+        error: 'Invalid Khalti key format. Use secret key starting with live_secret_key_ from test-admin/admin.'
+      });
+    }
+
     const { planType } = req.body;
     if (!planType || !SUBSCRIPTION_PLANS[planType]) {
       return res.status(400).json({ success: false, error: 'Invalid plan type' });
@@ -219,11 +232,20 @@ router.post('/initiate', authenticateToken, async (req, res) => {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    const purchaseOrderId = `DRP-${user._id}-${Date.now()}`;
+    const purchaseOrderId = `DRP-${Date.now().toString(36)}-${user._id.toString().slice(-8)}`;
     const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
     const amountPaisa = Math.round(plan.price * 100); // Khalti expects paisa; min 1000 (Rs 10)
     if (amountPaisa < 1000) {
       return res.status(400).json({ success: false, error: 'Amount must be at least Rs 10' });
+    }
+
+    const customerInfo = {
+      name: user.username || 'Customer',
+      email: user.email
+    };
+
+    if (KHALTI_SANDBOX) {
+      customerInfo.phone = '9800000000'; // Sandbox test IDs: 9800000000–9800000005
     }
 
     const payload = {
@@ -232,11 +254,7 @@ router.post('/initiate', authenticateToken, async (req, res) => {
       amount: amountPaisa,
       purchase_order_id: purchaseOrderId,
       purchase_order_name: `Driplytics ${plan.name} (${plan.duration} days)`,
-      customer_info: {
-        name: user.username || 'Customer',
-        email: user.email,
-        phone: '9800000000' // Sandbox test IDs: 9800000000–9800000005
-      }
+      customer_info: customerInfo
     };
 
     const response = await khaltiPost('/epayment/initiate/', payload);
@@ -266,7 +284,7 @@ router.post('/initiate', authenticateToken, async (req, res) => {
     res.status(isKhaltiAuthError ? 401 : 500).json({
       success: false,
       error: isKhaltiAuthError
-        ? 'Khalti authentication failed. Check KHALTI_SECRET_KEY and KHALTI_SANDBOX in server/.env.'
+        ? 'Khalti authentication failed. Use the SECRET key from test-admin/admin (not public key), and ensure KHALTI_SANDBOX matches the key environment.'
         : details?.detail || details?.amount?.[0] || 'Failed to initiate payment',
       details: details
     });
@@ -284,21 +302,69 @@ router.post('/verify', authenticateToken, async (req, res) => {
       return res.status(503).json({ success: false, error: 'Khalti is not configured' });
     }
 
-    const { pidx, status: callbackStatus } = req.body;
+    if (!hasLikelyKhaltiSecretKeyFormat) {
+      return res.status(503).json({
+        success: false,
+        error: 'Invalid Khalti key format. Use secret key starting with live_secret_key_ from test-admin/admin.'
+      });
+    }
+
+    const { pidx } = req.body;
     if (!pidx) {
       return res.status(400).json({ success: false, error: 'Payment ID (pidx) required' });
+    }
+
+    const payment = await Payment.findOne({ khaltiIdx: pidx });
+    if (!payment) {
+      return res.status(404).json({ success: false, error: 'Payment record not found' });
+    }
+
+    if (String(payment.user) !== String(req.userId)) {
+      return res.status(403).json({ success: false, error: 'Unauthorized payment verification attempt' });
+    }
+
+    if (payment.status === 'completed') {
+      const user = await User.findById(payment.user);
+      const now = new Date();
+      const isActiveSubscription =
+        user?.subscription?.type === payment.subscriptionType &&
+        user?.subscription?.status === 'active' &&
+        user?.subscription?.endDate &&
+        new Date(user.subscription.endDate) > now;
+
+      return res.json({
+        success: true,
+        message: 'Payment already verified',
+        subscription: {
+          type: payment.subscriptionType,
+          startDate: user?.subscription?.startDate,
+          endDate: user?.subscription?.endDate,
+          daysRemaining: isActiveSubscription
+            ? Math.ceil((new Date(user.subscription.endDate) - now) / (1000 * 60 * 60 * 24))
+            : payment.subscriptionDuration
+        }
+      });
     }
 
     // Lookup payment with Khalti (required for confirmation per docs)
     const lookupRes = await khaltiPost('/epayment/lookup/', { pidx });
 
     const paymentData = lookupRes.data;
-    const payment = await Payment.findOne({ khaltiIdx: pidx });
-    if (!payment) {
-      return res.status(404).json({ success: false, error: 'Payment record not found' });
-    }
 
     const status = paymentData.status;
+
+    const expectedAmountPaisa = Math.round(payment.amount * 100);
+    if (Number(paymentData.total_amount) !== expectedAmountPaisa) {
+      payment.status = 'failed';
+      payment.errorMessage = `Amount mismatch (expected ${expectedAmountPaisa}, received ${paymentData.total_amount})`;
+      await payment.save();
+
+      return res.status(400).json({
+        success: false,
+        error: 'Payment amount mismatch',
+        status
+      });
+    }
 
     // Only "Completed" = success (Khalti docs)
     if (status === 'Completed') {
@@ -331,6 +397,18 @@ router.post('/verify', authenticateToken, async (req, res) => {
           endDate: endDate,
           daysRemaining: plan.duration
         }
+      });
+    }
+
+    if (status === 'Pending' || status === 'Initiated') {
+      payment.status = 'pending';
+      payment.errorMessage = status;
+      await payment.save();
+
+      return res.status(202).json({
+        success: false,
+        error: 'Payment is still being processed. Please wait and try verifying again in a moment.',
+        status
       });
     }
 

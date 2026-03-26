@@ -522,7 +522,33 @@ function SneakerDetails() {
     },
   };
 
-  const currentPrice = sneaker.priceBySize ? sneaker.priceBySize[selectedSize] : sneaker.retailPrice;
+  const selectedSizePrice = Number(sneaker.priceBySize?.[selectedSize]);
+  const currentPrice = Number.isFinite(selectedSizePrice) && selectedSizePrice > 0
+    ? selectedSizePrice
+    : (Number(sneaker.retailPrice) || 0);
+  const retailPrice = Number(sneaker.retailPrice);
+  const hasValidRetailPrice = Number.isFinite(retailPrice) && retailPrice > 0;
+  const pricePremiumPercent = hasValidRetailPrice && currentPrice > 0
+    ? ((currentPrice - retailPrice) / retailPrice) * 100
+    : null;
+  const monthlyPriceChangePercent = (() => {
+    if (!priceHistory?.prices?.length) return null;
+
+    const validPrices = priceHistory.prices
+      .map(Number)
+      .filter((price) => Number.isFinite(price) && price > 0);
+
+    if (validPrices.length < 2) return null;
+
+    const monthWindow = validPrices.slice(-30);
+    if (monthWindow.length < 2) return null;
+
+    const startPrice = monthWindow[0];
+    const endPrice = monthWindow[monthWindow.length - 1];
+    if (startPrice <= 0) return null;
+
+    return ((endPrice - startPrice) / startPrice) * 100;
+  })();
 
   const marketStats = [
     { label: 'Lowest Ask', value: `$${Math.round(currentPrice * 0.96)}`, platform: 'StockX' },
@@ -567,9 +593,16 @@ function SneakerDetails() {
               <span className="px-3 py-1 bg-indigo-500/20 text-indigo-400 text-sm font-medium rounded-lg">
                 {sneaker.brand}
               </span>
-              <span className="px-3 py-1 bg-green-500/20 text-green-400 text-sm font-medium rounded-lg">
-                +12% this month
-              </span>
+              {monthlyPriceChangePercent !== null && (
+                <span className={`px-3 py-1 text-sm font-medium rounded-lg ${
+                  monthlyPriceChangePercent >= 0
+                    ? 'bg-green-500/20 text-green-400'
+                    : 'bg-red-500/20 text-red-400'
+                }`}>
+                  {monthlyPriceChangePercent >= 0 ? '+' : ''}
+                  {monthlyPriceChangePercent.toFixed(1)}% this month
+                </span>
+              )}
             </div>
 
             <h1 className="text-3xl font-bold text-white mb-2">{sneaker.name}</h1>
@@ -580,7 +613,7 @@ function SneakerDetails() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-gray-400 text-sm mb-1">Current Resale Price (Size {selectedSize})</p>
-                  <p className="text-4xl font-bold text-white">${sneaker.priceBySize[selectedSize]}</p>
+                  <p className="text-4xl font-bold text-white">${Math.round(currentPrice)}</p>
                 </div>
                 <button
                   onClick={handleFavoriteToggle}
@@ -751,7 +784,15 @@ function SneakerDetails() {
               </div>
               <div className="bg-white/5 rounded-xl p-4">
                 <p className="text-gray-400 text-xs mb-1">Price Premium</p>
-                <p className="text-green-400 font-semibold">+{Math.round((sneaker.priceBySize[selectedSize] / sneaker.retailPrice - 1) * 100)}%</p>
+                <p className={`font-semibold ${
+                  pricePremiumPercent === null
+                    ? 'text-gray-400'
+                    : (pricePremiumPercent >= 0 ? 'text-green-400' : 'text-red-400')
+                }`}>
+                  {pricePremiumPercent === null
+                    ? 'N/A'
+                    : `${pricePremiumPercent >= 0 ? '+' : ''}${Math.round(pricePremiumPercent)}%`}
+                </p>
               </div>
             </div>
 

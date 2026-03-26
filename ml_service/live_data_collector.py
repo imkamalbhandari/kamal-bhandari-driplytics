@@ -157,10 +157,106 @@ class RedditScraper:
     """
     
     def __init__(self):
+        user_agent = os.getenv(
+            'REDDIT_USER_AGENT',
+            'windows:driplytics.sneaker.analytics:v1.0 (by /u/driplytics_bot)'
+        )
+
         self.headers = {
-            'User-Agent': 'Driplytics/1.0 (Sneaker Analytics)'
+            'User-Agent': user_agent,
+            'Accept': 'application/json'
         }
+        self.session = requests.Session()
+        self.session.headers.update(self.headers)
+
+        self.reddit_client_id = os.getenv('REDDIT_CLIENT_ID')
+        self.reddit_client_secret = os.getenv('REDDIT_CLIENT_SECRET')
+        self.oauth_token = None
+        self.oauth_token_expires_at = None
+        self._logged_auth_warning = False
+
         self.subreddits = ['sneakers', 'Sneakerheads', 'SneakerDeals', 'streetwear']
+
+    def _ensure_oauth_token(self) -> Optional[str]:
+        """Get or refresh Reddit OAuth token for read-only API access."""
+        if not self.reddit_client_id or not self.reddit_client_secret:
+            return None
+
+        now = datetime.utcnow()
+        if self.oauth_token and self.oauth_token_expires_at and now < self.oauth_token_expires_at:
+            return self.oauth_token
+
+        try:
+            auth = requests.auth.HTTPBasicAuth(self.reddit_client_id, self.reddit_client_secret)
+            token_headers = {
+                'User-Agent': self.headers['User-Agent']
+            }
+            token_data = {'grant_type': 'client_credentials'}
+
+            token_response = self.session.post(
+                'https://www.reddit.com/api/v1/access_token',
+                auth=auth,
+                data=token_data,
+                headers=token_headers,
+                timeout=10
+            )
+
+            if token_response.status_code != 200:
+                if not self._logged_auth_warning:
+                    print(f"Reddit OAuth token error: {token_response.status_code}")
+                    self._logged_auth_warning = True
+                return None
+
+            payload = token_response.json()
+            token = payload.get('access_token')
+            expires_in = int(payload.get('expires_in', 3600))
+
+            if not token:
+                return None
+
+            self.oauth_token = token
+            self.oauth_token_expires_at = now + timedelta(seconds=max(expires_in - 60, 60))
+            return self.oauth_token
+
+        except Exception as e:
+            if not self._logged_auth_warning:
+                print(f"Reddit OAuth error: {e}")
+                self._logged_auth_warning = True
+            return None
+
+    def _reddit_get_json(self, oauth_url: str, public_url: str):
+        """Try OAuth API first, then fallback to public JSON endpoints."""
+        token = self._ensure_oauth_token()
+
+        if token:
+            try:
+                oauth_headers = {
+                    'Authorization': f'Bearer {token}',
+                    'User-Agent': self.headers['User-Agent'],
+                    'Accept': 'application/json'
+                }
+                response = self.session.get(oauth_url, headers=oauth_headers, timeout=10)
+                if response.status_code == 200:
+                    return response
+                if response.status_code == 401:
+                    self.oauth_token = None
+            except Exception:
+                pass
+
+        fallback_urls = [
+            public_url,
+            public_url.replace('https://www.reddit.com', 'https://old.reddit.com')
+        ]
+
+        for url in fallback_urls:
+            try:
+                response = self.session.get(url, timeout=10)
+                if response.status_code == 200:
+                    return response
+            except Exception:
+                continue
+
+        return None
     
     def get_subreddit_posts(self, subreddit: str, limit: int = 25, sort: str = 'hot') -> List[Dict]:
         """
@@ -172,10 +268,11 @@ class RedditScraper:
             sort: 'hot', 'new', 'top', 'rising'
         """
         try:
-            url = f'https://www.reddit.com/r/{subreddit}/{sort}.json?limit={limit}'
-            response = requests.get(url, headers=self.headers, timeout=10)
-            
-            if response.status_code == 200:
+            oauth_url = f'https://oauth.reddit.com/r/{subreddit}/{sort}?limit={limit}&raw_json=1'
+            public_url = f'https://www.reddit.com/r/{subreddit}/{sort}.json?limit={limit}&raw_json=1'
+            response = self._reddit_get_json(oauth_url, public_url)
+
+            if response is not None:
                 data = response.json()
                 posts = []
                 
@@ -197,7 +294,7 @@ class RedditScraper:
                 
                 return posts
             else:
-                print(f"Reddit API error: {response.status_code}")
+                print(f"Reddit API error: 403/blocked for r/{subreddit}")
                 return []
                 
         except Exception as e:
@@ -207,10 +304,11 @@ class RedditScraper:
     def get_post_comments(self, subreddit: str, post_id: str, limit: int = 50) -> List[Dict]:
         """Get comments from a specific post."""
         try:
-            url = f'https://www.reddit.com/r/{subreddit}/comments/{post_id}.json?limit={limit}'
-            response = requests.get(url, headers=self.headers, timeout=10)
-            
-            if response.status_code == 200:
+            oauth_url = f'https://oauth.reddit.com/r/{subreddit}/comments/{post_id}?limit={limit}&raw_json=1'
+            public_url = f'https://www.reddit.com/r/{subreddit}/comments/{post_id}.json?limit={limit}&raw_json=1'
+            response = self._reddit_get_json(oauth_url, public_url)
+
+            if response is not None:
                 data = response.json()
                 comments = []
                 
@@ -239,10 +337,19 @@ class RedditScraper:
         
         for subreddit in self.subreddits:
             try:
-                url = f'https://www.reddit.com/r/{subreddit}/search.json?q={requests.utils.quote(sneaker_name)}&restrict_sr=on&limit={limit//len(self.subreddits)}&sort=new'
-                response = requests.get(url, headers=self.headers, timeout=10)
-                
-                if response.status_code == 200:
+                query = requests.utils.quote(sneaker_name)
+                per_subreddit_limit = max(limit // len(self.subreddits), 1)
+                oauth_url = (
+                    f'https://oauth.reddit.com/r/{subreddit}/search?q={query}'
+                    f'&restrict_sr=on&limit={per_subreddit_limit}&sort=new&raw_json=1'
+                )
+                public_url = (
+                    f'https://www.reddit.com/r/{subreddit}/search.json?q={query}'
+                    f'&restrict_sr=on&limit={per_subreddit_limit}&sort=new&raw_json=1'
+                )
+                response = self._reddit_get_json(oauth_url, public_url)
+
+                if response is not None:
                     data = response.json()
                     for child in data.get('data', {}).get('children', []):
                         post_data = child.get('data', {})

@@ -61,6 +61,5 @@ const paymentSchema = new mongoose.Schema({
 
 // Index for faster queries
 paymentSchema.index({ user: 1, createdAt: -1 });
-paymentSchema.index({ khaltiTransactionId: 1 });
 
 module.exports = mongoose.model('Payment', paymentSchema);

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { paymentAPI } from '../../services/api';
 
 function Navbar() {
   const navigate = useNavigate();
@@ -7,6 +8,7 @@ function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(null);
   const profileRef = useRef(null);
   
   const user = (() => {
@@ -14,7 +16,24 @@ function Navbar() {
     return userData ? JSON.parse(userData) : null;
   })();
 
-  const isFreeUser = user && (!user.subscription || user.subscription === 'free' || user.subscription?.type === 'free') && !user.isAdmin;
+  const isFreeUser = user && !user.isAdmin && hasActiveSubscription === false;
+
+  const deriveActiveSubscriptionFromUser = (localUser) => {
+    if (!localUser || localUser.isAdmin) return false;
+
+    const subscription = localUser.subscription;
+    if (!subscription) return false;
+
+    const subscriptionType = typeof subscription === 'string' ? subscription : subscription.type;
+    if (!subscriptionType || subscriptionType === 'free') return false;
+
+    if (typeof subscription === 'object') {
+      if (subscription.status && subscription.status !== 'active') return false;
+      if (subscription.endDate && new Date(subscription.endDate) <= new Date()) return false;
+    }
+
+    return true;
+  };
 
   const getProfilePictureUrl = (picturePath) => {
     if (!picturePath) return null;
@@ -38,6 +57,41 @@ function Navbar() {
     setMobileMenuOpen(false);
     setProfileOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const syncSubscriptionStatus = async () => {
+      if (!user || user.isAdmin) {
+        if (isMounted) setHasActiveSubscription(null);
+        return;
+      }
+
+      const fallbackActiveStatus = deriveActiveSubscriptionFromUser(user);
+
+      try {
+        const statusRes = await paymentAPI.getStatus();
+        const serverHasActiveSubscription =
+          statusRes?.success &&
+          statusRes?.subscription?.isActive &&
+          statusRes?.subscription?.type !== 'free';
+
+        if (isMounted) {
+          setHasActiveSubscription(Boolean(serverHasActiveSubscription));
+        }
+      } catch {
+        if (isMounted) {
+          setHasActiveSubscription(fallbackActiveStatus);
+        }
+      }
+    };
+
+    syncSubscriptionStatus();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, user?.isAdmin]);
 
   const handleLogoutClick = () => {
     setProfileOpen(false);
