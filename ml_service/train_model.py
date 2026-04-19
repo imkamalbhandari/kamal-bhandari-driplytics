@@ -1,6 +1,6 @@
 """
 Driplytics - Sneaker Price Prediction Model Training
-Based on proposal: Train ML models (Random Forest, Linear Regression) to forecast resale prices.
+Train ML models (Random Forest, Linear Regression) to forecast resale prices.
 
 Dataset: stockx_complete.csv with columns:
 - Order Date, Brand, Sneaker Name, Sale Price, Retail Price, Release Date, Shoe Size, Buyer Region
@@ -104,7 +104,7 @@ def encode_features(df):
 def prepare_features(df):
     """Prepare features for training resale price prediction."""
     
-    # Features based on proposal requirements
+    # Features used for resale price prediction
     feature_columns = [
         'Brand_Encoded',        # Brand influence on price
         'Region_Encoded',       # Buyer region demand
@@ -150,7 +150,7 @@ def train_models(X, y, df):
     results = {}
     models = {}
     
-    # 1. Random Forest Regressor (primary model from proposal)
+    # 1. Random Forest Regressor (primary model)
     print("\n--- Random Forest Regressor ---")
     rf_model = RandomForestRegressor(
         n_estimators=200,

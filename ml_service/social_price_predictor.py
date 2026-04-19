@@ -135,19 +135,19 @@ class SocialPricePredictor:
         
     def load_models(self):
         """
-        Load ML models as specified in the proposal:
+        Load ML models used by the predictor:
         - Linear Regression
         - Random Forest
         - Prophet (Time Series) - loaded separately
         """
         try:
-            # Load Linear Regression model (from proposal)
+            # Load Linear Regression model
             lr_path = os.path.join(MODELS_DIR, 'linear_regression_model.pkl')
             if os.path.exists(lr_path):
                 self.models['linear_regression'] = joblib.load(lr_path)
                 print("  ✓ Linear Regression model loaded")
             
-            # Load Random Forest model (from proposal)
+            # Load Random Forest model
             rf_path = os.path.join(MODELS_DIR, 'random_forest_model.pkl')
             if os.path.exists(rf_path):
                 self.models['random_forest'] = joblib.load(rf_path)
@@ -223,7 +223,7 @@ class SocialPricePredictor:
         return features
     
     def get_random_forest_prediction(self, features: pd.DataFrame, current_price: float) -> Dict[str, Any]:
-        """Get prediction from Random Forest model (from proposal)."""
+        """Get prediction from Random Forest model."""
         try:
             if 'random_forest' not in self.models:
                 return None
@@ -249,7 +249,7 @@ class SocialPricePredictor:
             return None
     
     def get_linear_regression_prediction(self, features: pd.DataFrame, current_price: float) -> Dict[str, Any]:
-        """Get prediction from Linear Regression model (from proposal)."""
+        """Get prediction from Linear Regression model."""
         try:
             # Use linear regression with raw features (consistent with training)
             if 'linear_regression' in self.models:
@@ -449,7 +449,7 @@ class SocialPricePredictor:
                                     social_data: Dict,
                                     current_price: float) -> Dict[str, Any]:
         """
-        Calculate final price prediction using algorithms from proposal:
+        Calculate final price prediction using weighted model outputs:
         - Random Forest (40% weight)
         - Linear Regression (30% weight)  
         - Prophet/Time Series (30% weight)
@@ -461,7 +461,7 @@ class SocialPricePredictor:
         weights = []
         models_used = []
         
-        # Random Forest prediction (from proposal) - highest weight
+        # Random Forest prediction - highest weight
         if random_forest_pred and random_forest_pred.get('predicted_price'):
             rf_price = random_forest_pred['predicted_price']
             rf_confidence = random_forest_pred.get('confidence', 0.80)
@@ -469,14 +469,14 @@ class SocialPricePredictor:
             weights.append(0.40 * rf_confidence)
             models_used.append('Random Forest')
         
-        # Linear Regression prediction (from proposal)
+        # Linear Regression prediction
         lr_price = linear_pred['predicted_price']
         lr_confidence = linear_pred.get('confidence', 0.75)
         predictions.append(lr_price)
         weights.append(0.30 * lr_confidence)
         models_used.append('Linear Regression')
         
-        # Prophet/Time Series prediction (from proposal)
+        # Prophet/Time Series prediction
         if time_series and time_series.get('predicted_price_30d'):
             ts_price = time_series['predicted_price_30d']
             ts_confidence = time_series.get('confidence', 0.8)
@@ -614,19 +614,19 @@ class SocialPricePredictor:
             # Prepare features
             features = self.prepare_features(data)
             
-            # Get Random Forest prediction (from proposal)
+            # Get Random Forest prediction
             random_forest_pred = self.get_random_forest_prediction(features, current_market_price)
             
-            # Get Linear Regression prediction (from proposal)
+            # Get Linear Regression prediction
             linear_pred = self.get_linear_regression_prediction(features, current_market_price)
             
-            # Get Prophet/Time Series forecast (from proposal)
+            # Get Prophet/Time Series forecast
             time_series = self.get_time_series_forecast(sneaker_name, current_market_price)
             
             # Get Social Media data (Reddit + Google Trends)
             social_data = self.get_social_media_data(sneaker_name)
             
-            # Calculate final FUTURE prediction using all models from proposal
+            # Calculate final FUTURE prediction using all model outputs
             prediction = self.calculate_final_prediction(
                 random_forest_pred, linear_pred, time_series, social_data, current_market_price
             )

@@ -1,6 +1,6 @@
 """
 Driplytics - Sneaker Price Prediction API
-Flask-based API for serving ML predictions as mentioned in the proposal.
+Flask-based API for serving ML predictions.
 """
 
 from flask import Flask, request, jsonify
