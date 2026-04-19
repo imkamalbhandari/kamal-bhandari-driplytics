@@ -147,6 +147,20 @@ function Admin() {
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
+  const formatPlanLabel = (plan) => {
+    if (!plan) return 'Unknown';
+    return String(plan).replace(/[_-]/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+
+  const formatRevenueUser = (payment) => {
+    return payment.username || payment.userDisplayName || 'Archived Customer';
+  };
+
+  const activePlanBreakdown = stats?.subscriptionRevenue?.activeByPlan || [];
+  const activePlanSummary = activePlanBreakdown.length > 0
+    ? activePlanBreakdown.map((plan) => `${plan.count} ${formatPlanLabel(plan.plan).toLowerCase()}`).join(' · ')
+    : 'No active paid plans';
+
   const statusColors = {
     active: 'bg-green-500/20 text-green-400 border-green-500/30',
     pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
@@ -215,7 +229,7 @@ function Admin() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[  
                 { label: 'Total Users', value: stats.users.total, sub: `${stats.users.newThisWeek} new this week`, icon: '👥', color: 'from-indigo-500 to-purple-600' },
-                { label: 'Subscribers', value: stats.subscriptionRevenue?.activeSubscribers || 0, sub: `${stats.subscriptionRevenue?.premiumCount || 0} premium · ${stats.subscriptionRevenue?.proCount || 0} pro`, icon: '⭐', color: 'from-yellow-500 to-orange-600' },
+                { label: 'Subscribers', value: stats.subscriptionRevenue?.activeSubscribers || 0, sub: activePlanSummary, icon: '⭐', color: 'from-yellow-500 to-orange-600' },
                 { label: 'Subscription Revenue', value: `रू ${(stats.subscriptionRevenue?.totalRevenue || 0).toLocaleString()}`, sub: `रू ${(stats.subscriptionRevenue?.thisMonthRevenue || 0).toLocaleString()} this month`, icon: '💰', color: 'from-green-500 to-emerald-600' },
                 { label: 'Total Listings', value: stats.listings.total, sub: `${stats.listings.active} active`, icon: '📦', color: 'from-blue-500 to-cyan-600' },
               ].map(s => (
@@ -421,13 +435,27 @@ function Admin() {
               <div className="bg-white/5 rounded-2xl border border-white/10 p-6">
                 <h3 className="text-white font-semibold mb-4 flex items-center gap-2"><span>👥</span> Subscriber Breakdown</h3>
                 <div className="space-y-4">
-                  {/* Donut-style bars */}
                   {[
-                    { label: 'Free Users', value: stats.subscriptionRevenue?.freeUsers || 0, color: 'bg-gray-500', pct: ((stats.subscriptionRevenue?.freeUsers || 0) / Math.max(stats.users.total, 1) * 100).toFixed(1) },
-                    { label: 'Premium', value: stats.subscriptionRevenue?.premiumCount || 0, color: 'bg-violet-500', pct: ((stats.subscriptionRevenue?.premiumCount || 0) / Math.max(stats.users.total, 1) * 100).toFixed(1) },
-                    { label: 'Pro', value: stats.subscriptionRevenue?.proCount || 0, color: 'bg-purple-500', pct: ((stats.subscriptionRevenue?.proCount || 0) / Math.max(stats.users.total, 1) * 100).toFixed(1) },
-                    { label: 'Expired', value: stats.subscriptionRevenue?.expiredSubscribers || 0, color: 'bg-red-500', pct: ((stats.subscriptionRevenue?.expiredSubscribers || 0) / Math.max(stats.users.total, 1) * 100).toFixed(1) },
-                  ].map(item => (
+                    {
+                      label: 'Free Users',
+                      value: stats.subscriptionRevenue?.freeUsers || 0,
+                      color: 'bg-gray-500'
+                    },
+                    ...(activePlanBreakdown.length > 0
+                      ? activePlanBreakdown.map((plan, index) => ({
+                          label: `${formatPlanLabel(plan.plan)} (Active)`,
+                          value: plan.count,
+                          color: ['bg-violet-500', 'bg-purple-500', 'bg-blue-500', 'bg-cyan-500'][index % 4]
+                        }))
+                      : [{ label: 'Paid Subscribers (Active)', value: 0, color: 'bg-violet-500' }]),
+                    {
+                      label: 'Expired',
+                      value: stats.subscriptionRevenue?.expiredSubscribers || 0,
+                      color: 'bg-red-500'
+                    }
+                  ].map(item => {
+                    const pct = ((item.value || 0) / Math.max(stats.users.total, 1) * 100).toFixed(1);
+                    return (
                     <div key={item.label}>
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
@@ -440,10 +468,11 @@ function Admin() {
                         </div>
                       </div>
                       <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
-                        <div className={`h-full ${item.color} rounded-full transition-all`} style={{ width: `${Math.max(parseFloat(item.pct), 1)}%` }} />
+                        <div className={`h-full ${item.color} rounded-full transition-all`} style={{ width: `${Math.max(parseFloat(pct), 1)}%` }} />
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -454,14 +483,18 @@ function Admin() {
                   <div className="text-center py-8 text-gray-500 text-sm">No subscription payments yet</div>
                 ) : (
                   <div className="space-y-4">
-                    {(stats.subscriptionRevenue?.revenueByPlan || []).map(plan => (
-                      <div key={plan.plan} className={`p-4 rounded-xl border ${
-                        plan.plan === 'pro' ? 'bg-purple-500/10 border-purple-500/20' : 'bg-violet-500/10 border-violet-500/20'
-                      }`}>
+                    {(stats.subscriptionRevenue?.revenueByPlan || []).map((plan, index) => {
+                      const colorSet = [
+                        { wrapper: 'bg-violet-500/10 border-violet-500/20', text: 'text-violet-300' },
+                        { wrapper: 'bg-purple-500/10 border-purple-500/20', text: 'text-purple-300' },
+                        { wrapper: 'bg-blue-500/10 border-blue-500/20', text: 'text-blue-300' },
+                        { wrapper: 'bg-cyan-500/10 border-cyan-500/20', text: 'text-cyan-300' }
+                      ][index % 4];
+
+                      return (
+                      <div key={plan.plan || index} className={`p-4 rounded-xl border ${colorSet.wrapper}`}>
                         <div className="flex items-center justify-between mb-2">
-                          <span className={`text-sm font-bold uppercase ${
-                            plan.plan === 'pro' ? 'text-purple-300' : 'text-violet-300'
-                          }`}>{plan.plan}</span>
+                          <span className={`text-sm font-bold uppercase ${colorSet.text}`}>{formatPlanLabel(plan.plan)}</span>
                           <span className="text-white font-bold">रू {plan.revenue.toLocaleString()}</span>
                         </div>
                         <div className="flex items-center justify-between text-xs text-gray-400">
@@ -469,7 +502,8 @@ function Admin() {
                           <span>रू {Math.round(plan.revenue / Math.max(plan.count, 1))} avg</span>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
@@ -503,6 +537,7 @@ function Admin() {
             <div className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
               <div className="p-5 border-b border-white/10">
                 <h3 className="text-white font-semibold flex items-center gap-2"><span>🧾</span> Recent Payments</h3>
+                <p className="text-gray-500 text-xs mt-1">Showing post-launch completed payments only.</p>
               </div>
               {(stats.subscriptionRevenue?.recentPayments || []).length === 0 ? (
                 <div className="text-center py-12 text-gray-500 text-sm">No payments recorded yet</div>
@@ -524,14 +559,16 @@ function Admin() {
                         <tr key={p.id} className="hover:bg-white/5 transition-all">
                           <td className="px-5 py-3">
                             <div>
-                              <p className="text-white text-sm font-medium">{p.username}</p>
+                              <p className="text-white text-sm font-medium">{formatRevenueUser(p)}</p>
                               <p className="text-gray-500 text-xs">{p.email}</p>
                             </div>
                           </td>
                           <td className="px-5 py-3">
                             <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold capitalize ${
-                              p.plan === 'pro' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
-                            }`}>{p.plan}</span>
+                              p.plan === 'free'
+                                ? 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
+                                : 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                            }`}>{formatPlanLabel(p.plan)}</span>
                           </td>
                           <td className="px-5 py-3 text-green-400 font-semibold text-sm">रू {p.amount}</td>
                           <td className="px-5 py-3 text-gray-300 text-sm">{p.duration} days</td>
@@ -614,7 +651,7 @@ function Admin() {
                           {u.twoFactorEnabled && <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full font-medium">2FA</span>}
                           {u.subscriptionActive ? (
                             <span className={`px-2 py-0.5 text-xs rounded-full font-medium capitalize ${
-                              u.subscription?.type === 'pro' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
+                              'bg-violet-500/20 text-violet-400 border border-violet-500/30'
                             }`}>
                               {u.subscription?.type} · {u.subscriptionDaysLeft}d left
                             </span>

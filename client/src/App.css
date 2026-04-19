@@ -9,24 +9,17 @@ main {
 /* Content container styling for proper centering */
 .content-container {
   width: 100%;
-  max-width: 80rem; /* 1280px - same as max-w-7xl */
+  max-width: var(--layout-max-content);
   margin-left: auto;
   margin-right: auto;
-  padding-left: 1rem;
-  padding-right: 1rem;
+  padding-left: var(--layout-page-padding);
+  padding-right: var(--layout-page-padding);
 }
 
-@media (min-width: 640px) {
+@media (max-width: 768px) {
   .content-container {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
-  }
-}
-
-@media (min-width: 1024px) {
-  .content-container {
-    padding-left: 2rem;
-    padding-right: 2rem;
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
   }
 }
 

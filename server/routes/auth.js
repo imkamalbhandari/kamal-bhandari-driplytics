@@ -8,6 +8,11 @@ const path = require('path');
 const fs = require('fs');
 const User = require('../models/User');
 const OTP = require('../models/OTP');
+const Favorite = require('../models/Favorite');
+const Alert = require('../models/Alert');
+const Listing = require('../models/Listing');
+const Message = require('../models/Message');
+const Payment = require('../models/Payment');
 const { sendOTPEmail } = require('../services/emailService');
 
 // Multer config for profile picture uploads
@@ -406,11 +411,6 @@ router.get('/profile', authenticateToken, async (req, res) => {
     }
 
     // Get favorites count
-    const Favorite = require('../models/Favorite');
-    const Alert = require('../models/Alert');
-    const Listing = require('../models/Listing');
-    const Message = require('../models/Message');
-
     const [favoritesCount, alertsCount, listingsCount, messagesCount] = await Promise.all([
       Favorite.countDocuments({ userId: req.userId }),
       Alert.countDocuments({ userId: req.userId }),
@@ -453,7 +453,8 @@ router.get('/profile', authenticateToken, async (req, res) => {
       .slice(0, 15);
 
     // Subscription info
-    const subscriptionType = user.subscription?.type || 'free';
+    const rawSubscriptionType = user.subscription?.type || 'free';
+    const subscriptionType = rawSubscriptionType === 'free' ? 'free' : 'basic';
     const subscriptionStatus = user.subscription?.status || 'active';
     const remainingPredictions = user.getRemainingFreePredictions();
 
@@ -552,6 +553,106 @@ router.put('/profile', authenticateToken, async (req, res) => {
     });
   }
 });
+
+// Delete account permanently
+const deleteAccountHandler = async (req, res) => {
+  try {
+    const { currentPassword } = req.body || {};
+
+    if (!currentPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password is required to delete your account'
+      });
+    }
+
+    const user = await User.findById(req.userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const isPasswordValid = await user.comparePassword(currentPassword);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+    }
+
+    const userId = user._id;
+
+    // Delete user first so login is blocked even if some cleanup tasks fail.
+    const deleteResult = await User.deleteOne({ _id: userId });
+    if (!deleteResult.deletedCount) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to delete account'
+      });
+    }
+
+    // Best-effort cleanup of related data.
+    const cleanupTasks = [
+      Favorite.deleteMany({ userId }),
+      Alert.deleteMany({ userId }),
+      Listing.deleteMany({ sellerId: userId }),
+      Listing.updateMany(
+        { buyerId: userId },
+        { $set: { buyerId: null, buyerUsername: 'Deleted User' } }
+      ),
+      Message.deleteMany({ $or: [{ senderId: userId }, { receiverId: userId }] }),
+      OTP.deleteMany({ email: user.email.toLowerCase() })
+    ];
+
+    cleanupTasks.push(
+      Payment.updateMany(
+        { user: userId },
+        {
+          $set: {
+            userDisplayName: user.username || 'Deleted User',
+            userDisplayEmail: user.email || ''
+          }
+        }
+      )
+    );
+
+    // Remove stored profile image, if present (best-effort).
+    if (user.profilePicture) {
+      cleanupTasks.push(
+        Promise.resolve().then(() => {
+          const relativePath = user.profilePicture.replace(/^\\+|^\/+/, '');
+          const picturePath = path.join(__dirname, '..', relativePath);
+          if (fs.existsSync(picturePath)) {
+            fs.unlinkSync(picturePath);
+          }
+        })
+      );
+    }
+
+    const cleanupResults = await Promise.allSettled(cleanupTasks);
+    const failedCleanupCount = cleanupResults.filter((result) => result.status === 'rejected').length;
+
+    res.json({
+      success: true,
+      message: failedCleanupCount > 0
+        ? 'Account deleted successfully (some related data cleanup is pending)'
+        : 'Account deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete account error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error deleting account',
+      error: error.message
+    });
+  }
+};
+
+router.delete('/profile', authenticateToken, deleteAccountHandler);
+router.post('/profile/delete', authenticateToken, deleteAccountHandler);
 
 // Upload/Change profile picture
 router.post('/profile/picture', authenticateToken, (req, res) => {

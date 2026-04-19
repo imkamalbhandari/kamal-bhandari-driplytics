@@ -186,7 +186,7 @@ function ResetPassword() {
                   onChange={handleChange}
                   required
                   minLength={6}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all pr-12 ${
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all pr-12 text-gray-900 caret-indigo-600 ${
                     errors.newPassword ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'
                   }`}
                   placeholder="Enter new password"
@@ -240,7 +240,7 @@ function ResetPassword() {
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   required
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all pr-12 ${
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all pr-12 text-gray-900 caret-indigo-600 ${
                     errors.confirmPassword ? 'border-red-300 bg-red-50' : formData.confirmPassword && formData.confirmPassword === formData.newPassword ? 'border-green-300 bg-green-50' : 'border-gray-300 bg-white'
                   }`}
                   placeholder="Confirm new password"

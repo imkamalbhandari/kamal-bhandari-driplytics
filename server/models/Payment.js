@@ -6,6 +6,14 @@ const paymentSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  userDisplayName: {
+    type: String,
+    default: ''
+  },
+  userDisplayEmail: {
+    type: String,
+    default: ''
+  },
   // Khalti payment details
   khaltiTransactionId: {
     type: String,
@@ -28,7 +36,7 @@ const paymentSchema = new mongoose.Schema({
   // Subscription details
   subscriptionType: {
     type: String,
-    enum: ['premium', 'pro'],
+    enum: ['basic', 'premium', 'pro'],
     required: true
   },
   subscriptionDuration: {

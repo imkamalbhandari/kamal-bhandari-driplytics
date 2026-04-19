@@ -6,6 +6,12 @@ const Message = require('../models/Message');
 const Payment = require('../models/Payment');
 const { authenticateToken } = require('../middleware/auth');
 
+const REVENUE_CUTOFF_DATE = new Date(process.env.REVENUE_CUTOFF_DATE || '2026-04-14T00:00:00.000Z');
+
+const getRevenueStartDate = (startDate) => {
+  return startDate > REVENUE_CUTOFF_DATE ? startDate : REVENUE_CUTOFF_DATE;
+};
+
 // Admin middleware
 const requireAdmin = async (req, res, next) => {
   try {
@@ -17,6 +23,13 @@ const requireAdmin = async (req, res, next) => {
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Server error' });
   }
+};
+
+const normalizeRevenuePlanLabel = (plan) => {
+  const normalized = String(plan || '').toLowerCase();
+  if (!normalized) return 'basic';
+  if (normalized === 'free') return 'free';
+  return 'basic';
 };
 
 // ==================== DASHBOARD STATS ====================
@@ -36,16 +49,48 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
       'subscription.status': 'active',
       'subscription.endDate': { $gt: now }
     });
-    const premiumCount = await User.countDocuments({ 'subscription.type': 'premium', 'subscription.status': 'active', 'subscription.endDate': { $gt: now } });
-    const proCount = await User.countDocuments({ 'subscription.type': 'pro', 'subscription.status': 'active', 'subscription.endDate': { $gt: now } });
+
+    const activeByPlan = await User.aggregate([
+      {
+        $match: {
+          'subscription.type': { $ne: 'free' },
+          'subscription.status': 'active',
+          'subscription.endDate': { $gt: now }
+        }
+      },
+      {
+        $group: {
+          _id: '$subscription.type',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    const activeByPlanMap = activeByPlan.reduce((acc, item) => {
+      const key = item._id || 'unknown';
+      acc[key] = item.count;
+      return acc;
+    }, {});
+
     const expiredSubscribers = await User.countDocuments({
       'subscription.type': { $ne: 'free' },
       'subscription.endDate': { $lte: now }
     });
 
+    const freeUsers = await User.countDocuments({
+      $or: [
+        { 'subscription.type': 'free' },
+        { 'subscription.type': { $exists: false } },
+        { subscription: { $exists: false } }
+      ]
+    });
+
     // Payment/revenue aggregation
+    const revenueMatch = { status: 'completed', createdAt: { $gte: REVENUE_CUTOFF_DATE } };
+
     const completedPayments = await Payment.aggregate([
-      { $match: { status: 'completed' } },
+      { $match: revenueMatch },
       { $group: {
         _id: null,
         totalRevenue: { $sum: '$amount' },
@@ -57,8 +102,9 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
 
     // Monthly revenue (last 6 months)
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const monthlyRevenueStart = getRevenueStartDate(sixMonthsAgo);
     const monthlyRevenue = await Payment.aggregate([
-      { $match: { status: 'completed', createdAt: { $gte: sixMonthsAgo } } },
+      { $match: { status: 'completed', createdAt: { $gte: monthlyRevenueStart } } },
       { $group: {
         _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
         revenue: { $sum: '$amount' },
@@ -69,24 +115,26 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
 
     // Revenue by plan type
     const revenueByPlan = await Payment.aggregate([
-      { $match: { status: 'completed' } },
+      { $match: revenueMatch },
+      { $addFields: { normalizedPlan: { $cond: [{ $eq: ['$subscriptionType', 'free'] }, 'free', 'basic'] } } },
       { $group: {
-        _id: '$subscriptionType',
+        _id: '$normalizedPlan',
         revenue: { $sum: '$amount' },
         count: { $sum: 1 }
       }}
     ]);
 
     // Recent payments
-    const recentPayments = await Payment.find({ status: 'completed' })
+    const recentPayments = await Payment.find(revenueMatch)
       .populate('user', 'username email')
       .sort({ createdAt: -1 })
       .limit(10);
 
     // This month's revenue
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thisMonthStart = getRevenueStartDate(monthStart);
     const thisMonthPayments = await Payment.aggregate([
-      { $match: { status: 'completed', createdAt: { $gte: monthStart } } },
+      { $match: { status: 'completed', createdAt: { $gte: thisMonthStart } } },
       { $group: { _id: null, revenue: { $sum: '$amount' }, count: { $sum: 1 } } }
     ]);
     const thisMonth = thisMonthPayments[0] || { revenue: 0, count: 0 };
@@ -146,10 +194,11 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
           totalPayments: paymentStats.count,
           avgPayment: Math.round(paymentStats.avgPayment),
           activeSubscribers,
-          premiumCount,
-          proCount,
+          activeByPlan: activeByPlan.map(p => ({ plan: p._id || 'unknown', count: p.count })),
+          premiumCount: activeByPlanMap.premium || 0,
+          proCount: activeByPlanMap.pro || 0,
           expiredSubscribers,
-          freeUsers: totalUsers - activeSubscribers,
+          freeUsers,
           thisMonthRevenue: Math.round(thisMonth.revenue),
           thisMonthPayments: thisMonth.count,
           monthlyRevenue: monthlyRevenue.map(m => ({
@@ -157,13 +206,15 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
             revenue: Math.round(m.revenue),
             count: m.count
           })),
-          revenueByPlan: revenueByPlan.map(p => ({ plan: p._id, revenue: Math.round(p.revenue), count: p.count })),
+          revenueByPlan: revenueByPlan.map(p => ({ plan: normalizeRevenuePlanLabel(p._id), revenue: Math.round(p.revenue), count: p.count })),
           recentPayments: recentPayments.map(p => ({
             id: p._id,
-            username: p.user?.username || 'Deleted User',
-            email: p.user?.email || '',
+            username: p.user?.username || p.userDisplayName || 'Deleted User',
+            userDisplayName: p.userDisplayName || p.user?.username || '',
+            email: p.user?.email || p.userDisplayEmail || '',
+            userDisplayEmail: p.userDisplayEmail || p.user?.email || '',
             amount: p.amount,
-            plan: p.subscriptionType,
+            plan: normalizeRevenuePlanLabel(p.subscriptionType),
             duration: p.subscriptionDuration,
             date: p.createdAt,
             transactionId: p.khaltiTransactionId

@@ -135,6 +135,21 @@ export const authAPI = {
     return response.data;
   },
 
+  // Delete account permanently
+  deleteAccount: async (currentPassword) => {
+    try {
+      const response = await api.post('/auth/profile/delete', { currentPassword });
+      return response.data;
+    } catch (error) {
+      // Fallback for servers running older route shape.
+      if (error.response?.status === 404 || error.response?.status === 405) {
+        const response = await api.delete('/auth/profile', { data: { currentPassword } });
+        return response.data;
+      }
+      throw error;
+    }
+  },
+
   // Upload profile picture
   uploadProfilePicture: async (file) => {
     const formData = new FormData();

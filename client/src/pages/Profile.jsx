@@ -42,6 +42,10 @@ function Profile() {
   const [statsLoading, setStatsLoading] = useState(true);
   const [profilePicture, setProfilePicture] = useState(user?.profilePicture || null);
   const [uploadingPicture, setUploadingPicture] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // 2FA States
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
@@ -375,11 +379,53 @@ function Profile() {
     }
   };
 
-  const handleDeleteAccount = () => {
-    if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      navigate('/login');
+  const openDeleteModal = () => {
+    setDeletePassword('');
+    setDeleteError('');
+    setShowDeleteModal(true);
+  };
+
+  const closeDeleteModal = () => {
+    if (deleteAccountLoading) return;
+    setDeletePassword('');
+    setDeleteError('');
+    setShowDeleteModal(false);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword) {
+      setDeleteError('Please enter your current password to confirm account deletion.');
+      return;
+    }
+
+    setDeleteAccountLoading(true);
+    setDeleteError('');
+    setMessage({ type: '', text: '' });
+
+    try {
+      const response = await authAPI.deleteAccount(deletePassword);
+
+      if (response?.success) {
+        closeDeleteModal();
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/signup');
+        return;
+      }
+
+      const responseMessage = response?.message || 'Failed to delete account';
+      setDeleteError(responseMessage);
+      setMessage({ type: 'error', text: responseMessage });
+    } catch (error) {
+      const apiMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        'Failed to delete account';
+      setDeleteError(apiMessage);
+      setMessage({ type: 'error', text: apiMessage });
+    } finally {
+      setDeleteAccountLoading(false);
     }
   };
 
@@ -530,6 +576,78 @@ function Profile() {
               : 'bg-red-500/20 border border-red-500/30 text-red-400'
           }`}>
             {message.text}
+          </div>
+        )}
+
+        {showDeleteModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={closeDeleteModal} />
+
+            <div className="relative w-full max-w-md bg-[#111216] border border-red-500/30 rounded-2xl shadow-2xl p-6 animate-fade-in">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <h3 className="text-xl font-semibold text-white">Delete Account</h3>
+                  <p className="text-gray-400 text-sm mt-1">This action is permanent and cannot be undone.</p>
+                </div>
+                <button
+                  onClick={closeDeleteModal}
+                  disabled={deleteAccountLoading}
+                  className="text-gray-500 hover:text-white transition-colors disabled:opacity-50"
+                  aria-label="Close delete account dialog"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 mb-5">
+                <p className="text-red-300 text-sm">
+                  All profile data, favorites, alerts, listings, messages, and payments linked to this account will be removed.
+                </p>
+              </div>
+
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Enter current password to confirm
+              </label>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !deleteAccountLoading) {
+                    e.preventDefault();
+                    handleDeleteAccount();
+                  }
+                }}
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                placeholder="Current password"
+                autoFocus
+              />
+
+              {deleteError && (
+                <p className="mt-2 text-sm text-red-400">{deleteError}</p>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={closeDeleteModal}
+                  disabled={deleteAccountLoading}
+                  className="flex-1 px-4 py-2.5 bg-white/10 text-gray-300 rounded-xl hover:bg-white/20 transition-all disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  disabled={deleteAccountLoading || !deletePassword}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all disabled:opacity-50"
+                >
+                  {deleteAccountLoading ? 'Deleting...' : 'Delete Account'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -824,8 +942,9 @@ function Profile() {
                 Once you delete your account, there is no going back. Please be certain.
               </p>
               <button
-                onClick={handleDeleteAccount}
-                className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all font-medium"
+                onClick={openDeleteModal}
+                disabled={deleteAccountLoading}
+                className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all font-medium disabled:opacity-50"
               >
                 Delete Account
               </button>
@@ -872,11 +991,10 @@ function Profile() {
                 <h3 className="text-sm font-medium text-gray-400 mb-3">Subscription</h3>
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    subscription.type === 'pro' ? 'bg-yellow-500/20' :
-                    subscription.type === 'premium' ? 'bg-indigo-500/20' : 'bg-gray-500/20'
+                    subscription.type !== 'free' ? 'bg-indigo-500/20' : 'bg-gray-500/20'
                   }`}>
-                    {subscription.type === 'pro' ? (
-                      <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    {subscription.type !== 'free' ? (
+                      <svg className="w-5 h-5 text-indigo-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
                     ) : (
                       <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                     )}

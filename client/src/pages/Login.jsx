@@ -234,7 +234,7 @@ function Login() {
                     onChange={(e) => handle2FAChange(index, e.target.value)}
                     onKeyDown={(e) => handle2FAKeyDown(index, e)}
                     onPaste={handle2FAPaste}
-                    className={`w-12 h-14 text-center text-2xl font-bold border-2 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all ${
+                    className={`w-12 h-14 text-center text-2xl font-bold text-gray-900 caret-indigo-600 border-2 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all ${
                       digit ? 'border-indigo-400 bg-indigo-50' : 'border-gray-300 bg-white'
                     }`}
                     autoFocus={index === 0}

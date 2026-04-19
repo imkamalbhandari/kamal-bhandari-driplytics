@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { listingsAPI, sneakerAPI } from '../services/api';
 
@@ -25,6 +25,17 @@ function Trade() {
   const [searchingShoe, setSearchingShoe] = useState(false);
   const [selectedShoe, setSelectedShoe] = useState(null);
   const [newListing, setNewListing] = useState({
+    size: '',
+    condition: 'new',
+    askingPrice: '',
+    description: ''
+  });
+
+  // Edit listing modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editingListing, setEditingListing] = useState(null);
+  const [editListing, setEditListing] = useState({
     size: '',
     condition: 'new',
     askingPrice: '',
@@ -169,6 +180,59 @@ function Trade() {
       }
     } catch (err) {
       setMessage({ type: 'error', text: err.response?.data?.message || 'Failed to cancel listing' });
+    }
+  };
+
+  const openEditModal = (listing) => {
+    setEditingListing(listing);
+    setEditListing({
+      size: listing.size || '',
+      condition: listing.condition || 'new',
+      askingPrice: listing.askingPrice || '',
+      description: listing.description || ''
+    });
+    setShowEditModal(true);
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setEditingListing(null);
+    setEditListing({
+      size: '',
+      condition: 'new',
+      askingPrice: '',
+      description: ''
+    });
+  };
+
+  const handleUpdateListing = async (e) => {
+    e.preventDefault();
+    if (!editingListing) return;
+
+    if (!editListing.size || !editListing.askingPrice) {
+      setMessage({ type: 'error', text: 'Size and asking price are required' });
+      return;
+    }
+
+    setEditLoading(true);
+    try {
+      const payload = {
+        size: editListing.size,
+        condition: editListing.condition,
+        askingPrice: Number(editListing.askingPrice),
+        description: editListing.description
+      };
+
+      const response = await listingsAPI.update(editingListing.id, payload);
+      if (response.success) {
+        setMessage({ type: 'success', text: 'Listing updated successfully!' });
+        closeEditModal();
+        fetchData();
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Failed to update listing' });
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -440,12 +504,20 @@ function Trade() {
                           </div>
                         </div>
                         {listing.status === 'active' && (
-                          <button
-                            onClick={() => handleCancelListing(listing.id)}
-                            className="mt-3 px-3 py-1 text-red-400 hover:bg-red-500/20 rounded-lg text-sm transition-all"
-                          >
-                            Cancel Listing
-                          </button>
+                          <div className="mt-3 flex items-center gap-2">
+                            <button
+                              onClick={() => openEditModal(listing)}
+                              className="px-3 py-1 text-indigo-300 hover:bg-indigo-500/20 rounded-lg text-sm transition-all"
+                            >
+                              Edit Details
+                            </button>
+                            <button
+                              onClick={() => handleCancelListing(listing.id)}
+                              className="px-3 py-1 text-red-400 hover:bg-red-500/20 rounded-lg text-sm transition-all"
+                            >
+                              Cancel Listing
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -730,6 +802,96 @@ function Trade() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Listing Modal */}
+      {showEditModal && editingListing && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 rounded-2xl border border-white/10 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-white/10">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">Edit Listing Details</h2>
+                <button onClick={closeEditModal} className="text-gray-400 hover:text-white">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleUpdateListing} className="p-6 space-y-4">
+              <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                <p className="text-indigo-400 text-sm font-medium">{editingListing.brand}</p>
+                <p className="text-white font-semibold">{editingListing.name}</p>
+                <p className="text-gray-500 text-xs mt-1">Only active listings can be updated</p>
+              </div>
+
+              <div>
+                <label className="block text-gray-400 text-sm mb-2">Size (US)</label>
+                <input
+                  type="text"
+                  placeholder="e.g., 10, 10.5"
+                  value={editListing.size}
+                  onChange={(e) => setEditListing({ ...editListing, size: e.target.value })}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-400 text-sm mb-2">Condition</label>
+                <select
+                  value={editListing.condition}
+                  onChange={(e) => setEditListing({ ...editListing, condition: e.target.value })}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none cursor-pointer"
+                >
+                  <option value="new" className="bg-gray-900">Brand New (DS)</option>
+                  <option value="like-new" className="bg-gray-900">Like New (Worn 1-2 times)</option>
+                  <option value="good" className="bg-gray-900">Good (Light wear)</option>
+                  <option value="fair" className="bg-gray-900">Fair (Visible wear)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-gray-400 text-sm mb-2">Asking Price ($)</label>
+                <input
+                  type="number"
+                  placeholder="Enter your updated price"
+                  value={editListing.askingPrice}
+                  onChange={(e) => setEditListing({ ...editListing, askingPrice: e.target.value })}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-400 text-sm mb-2">Description (optional)</label>
+                <textarea
+                  placeholder="Add or update details about the shoe..."
+                  value={editListing.description}
+                  onChange={(e) => setEditListing({ ...editListing, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={closeEditModal}
+                  className="flex-1 py-3 bg-white/5 text-white rounded-xl hover:bg-white/10 transition-all font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editLoading}
+                  className="flex-1 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all font-medium disabled:opacity-50"
+                >
+                  {editLoading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

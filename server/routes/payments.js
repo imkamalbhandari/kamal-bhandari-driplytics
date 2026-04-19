@@ -76,19 +76,32 @@ const khaltiPost = async (endpoint, payload) => {
 };
 
 // Subscription plans
+const ACTIVE_PLAN_KEY = 'basic';
+const LEGACY_PLAN_ALIASES = {
+  premium: ACTIVE_PLAN_KEY,
+  pro: ACTIVE_PLAN_KEY
+};
+
 const SUBSCRIPTION_PLANS = {
-  premium: {
-    name: 'Premium',
-    price: 299, // NPR
+  basic: {
+    name: 'Basic',
+    price: 300, // NPR
     duration: 30, // days
     features: ['Unlimited predictions', 'Priority support', 'Advanced analytics']
-  },
-  pro: {
-    name: 'Pro',
-    price: 799, // NPR
-    duration: 90, // days
-    features: ['Everything in Premium', 'API access', 'Custom alerts', 'Batch predictions']
   }
+};
+
+const normalizePlanType = (planType) => {
+  const normalized = String(planType || '').toLowerCase();
+  if (!normalized) return null;
+  if (SUBSCRIPTION_PLANS[normalized]) return normalized;
+  if (LEGACY_PLAN_ALIASES[normalized]) return LEGACY_PLAN_ALIASES[normalized];
+  return null;
+};
+
+const normalizeSubscriptionType = (subscriptionType) => {
+  if (!subscriptionType || subscriptionType === 'free') return 'free';
+  return normalizePlanType(subscriptionType) || String(subscriptionType).toLowerCase();
 };
 
 /**
@@ -122,7 +135,7 @@ router.get('/status', authenticateToken, async (req, res) => {
     res.json({
       success: true,
       subscription: {
-        type: user.subscription?.type || 'free',
+        type: normalizeSubscriptionType(user.subscription?.type),
         status: user.subscription?.status || 'active',
         isActive: isSubscribed,
         endDate: user.subscription?.endDate,
@@ -222,11 +235,12 @@ router.post('/initiate', authenticateToken, async (req, res) => {
     }
 
     const { planType } = req.body;
-    if (!planType || !SUBSCRIPTION_PLANS[planType]) {
+    const normalizedPlanType = normalizePlanType(planType || ACTIVE_PLAN_KEY);
+    if (!normalizedPlanType) {
       return res.status(400).json({ success: false, error: 'Invalid plan type' });
     }
 
-    const plan = SUBSCRIPTION_PLANS[planType];
+    const plan = SUBSCRIPTION_PLANS[normalizedPlanType];
     const user = await User.findById(req.userId);
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
@@ -261,10 +275,12 @@ router.post('/initiate', authenticateToken, async (req, res) => {
 
     const payment = new Payment({
       user: user._id,
+      userDisplayName: user.username || '',
+      userDisplayEmail: user.email || '',
       khaltiTransactionId: purchaseOrderId,
       khaltiIdx: response.data.pidx,
       amount: plan.price,
-      subscriptionType: planType,
+      subscriptionType: normalizedPlanType,
       subscriptionDuration: plan.duration,
       status: 'pending'
     });
@@ -327,7 +343,7 @@ router.post('/verify', authenticateToken, async (req, res) => {
       const user = await User.findById(payment.user);
       const now = new Date();
       const isActiveSubscription =
-        user?.subscription?.type === payment.subscriptionType &&
+        normalizeSubscriptionType(user?.subscription?.type) === normalizeSubscriptionType(payment.subscriptionType) &&
         user?.subscription?.status === 'active' &&
         user?.subscription?.endDate &&
         new Date(user.subscription.endDate) > now;
@@ -336,7 +352,7 @@ router.post('/verify', authenticateToken, async (req, res) => {
         success: true,
         message: 'Payment already verified',
         subscription: {
-          type: payment.subscriptionType,
+          type: normalizeSubscriptionType(payment.subscriptionType),
           startDate: user?.subscription?.startDate,
           endDate: user?.subscription?.endDate,
           daysRemaining: isActiveSubscription
@@ -374,12 +390,14 @@ router.post('/verify', authenticateToken, async (req, res) => {
       await payment.save();
 
       const user = await User.findById(payment.user);
-      const plan = SUBSCRIPTION_PLANS[payment.subscriptionType];
+      const normalizedPlanType = normalizePlanType(payment.subscriptionType) || ACTIVE_PLAN_KEY;
+      const plan = SUBSCRIPTION_PLANS[normalizedPlanType];
       const now = new Date();
-      const endDate = new Date(now.getTime() + plan.duration * 24 * 60 * 60 * 1000);
+      const durationDays = plan?.duration || payment.subscriptionDuration || 30;
+      const endDate = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
       user.subscription = {
-        type: payment.subscriptionType,
+        type: normalizedPlanType,
         status: 'active',
         startDate: now,
         endDate: endDate,
@@ -392,10 +410,10 @@ router.post('/verify', authenticateToken, async (req, res) => {
         success: true,
         message: 'Payment verified successfully',
         subscription: {
-          type: payment.subscriptionType,
+          type: normalizedPlanType,
           startDate: now,
           endDate: endDate,
-          daysRemaining: plan.duration
+          daysRemaining: durationDays
         }
       });
     }
@@ -461,7 +479,7 @@ router.get('/history', authenticateToken, async (req, res) => {
       payments: payments.map(p => ({
         id: p._id,
         amount: p.amount,
-        subscriptionType: p.subscriptionType,
+        subscriptionType: normalizeSubscriptionType(p.subscriptionType),
         status: p.status,
         date: p.createdAt,
         transactionId: p.khaltiTransactionId

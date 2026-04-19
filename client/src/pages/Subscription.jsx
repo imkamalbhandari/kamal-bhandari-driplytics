@@ -15,6 +15,12 @@ function Subscription() {
   const [verifying, setVerifying] = useState(false);
   const [message, setMessage] = useState(null);
 
+  const paidPlanKey = plans
+    ? (plans.basic ? 'basic' : plans.premium ? 'premium' : Object.keys(plans)[0])
+    : null;
+  const paidPlan = paidPlanKey ? plans?.[paidPlanKey] : null;
+  const hasActivePaidPlan = !!(status?.subscription?.isActive && status?.subscription?.type !== 'free');
+
   // Khalti redirect callback: return_url receives ?pidx=...&transaction_id=...&status=... etc.
   useEffect(() => {
     const pidx = searchParams.get('pidx');
@@ -151,7 +157,7 @@ function Subscription() {
             Upgrade your experience
           </h1>
           <p className="text-gray-400 text-lg max-w-xl mx-auto">
-            Get unlimited predictions and premium features. Pay securely with Khalti.
+            Get unlimited predictions and paid features. Pay securely with Khalti.
           </p>
         </header>
 
@@ -193,9 +199,7 @@ function Subscription() {
                       className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold ${
                         status.subscription.type === 'free'
                           ? 'bg-gray-500/20 text-gray-300'
-                          : status.subscription.type === 'premium'
-                          ? 'bg-violet-500/20 text-violet-300'
-                          : 'bg-purple-500/20 text-purple-300'
+                          : 'bg-violet-500/20 text-violet-300'
                       }`}
                     >
                       {status.subscription.type === 'free' && (
@@ -232,23 +236,22 @@ function Subscription() {
           </section>
         )}
 
-        {/* Pricing cards */}
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* Premium */}
-          {plans?.premium && (
+        {/* Pricing card */}
+        <div className="max-w-2xl mx-auto">
+          {paidPlan && (
             <article className="group relative bg-gradient-to-b from-white/[0.06] to-transparent backdrop-blur-sm rounded-3xl p-8 border border-white/10 hover:border-violet-500/40 transition-all duration-300 animate-fade-in">
               <div className="absolute top-5 right-5">
                 <span className="px-3 py-1 rounded-full text-xs font-semibold bg-violet-500/30 text-violet-300 border border-violet-500/30">
                   Popular
                 </span>
               </div>
-              <h3 className="text-2xl font-bold text-white mb-1">{plans.premium.name}</h3>
+              <h3 className="text-2xl font-bold text-white mb-1">{paidPlan.name}</h3>
               <div className="flex items-baseline gap-2 mb-6">
-                <span className="text-4xl font-bold text-white">रू {plans.premium.price}</span>
-                <span className="text-gray-500">/ {plans.premium.duration} days</span>
+                <span className="text-4xl font-bold text-white">रू {paidPlan.price}</span>
+                <span className="text-gray-500">/ {paidPlan.duration} days</span>
               </div>
               <ul className="space-y-4 mb-8">
-                {plans.premium.features.map((feature, i) => (
+                {paidPlan.features.map((feature, i) => (
                   <li key={i} className="flex items-center gap-3 text-gray-300">
                     <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
                       <svg className="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -260,13 +263,13 @@ function Subscription() {
                 ))}
               </ul>
               <button
-                onClick={() => handleSubscribe('premium')}
-                disabled={processingPayment || status?.subscription?.type === 'premium'}
+                onClick={() => handleSubscribe(paidPlanKey)}
+                disabled={processingPayment || hasActivePaidPlan}
                 className="w-full py-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white shadow-lg shadow-violet-500/20 hover:shadow-violet-500/30"
               >
                 {processingPayment ? (
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : status?.subscription?.type === 'premium' ? (
+                ) : hasActivePaidPlan ? (
                   'Current plan'
                 ) : (
                   <>
@@ -278,49 +281,10 @@ function Subscription() {
             </article>
           )}
 
-          {/* Pro */}
-          {plans?.pro && (
-            <article className="group relative bg-gradient-to-b from-white/[0.06] to-transparent backdrop-blur-sm rounded-3xl p-8 border border-white/10 hover:border-purple-500/40 transition-all duration-300 animate-fade-in">
-              <div className="absolute top-5 right-5">
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/30 text-purple-300 border border-purple-500/30">
-                  Best value
-                </span>
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-1">{plans.pro.name}</h3>
-              <div className="flex items-baseline gap-2 mb-6">
-                <span className="text-4xl font-bold text-white">रू {plans.pro.price}</span>
-                <span className="text-gray-500">/ {plans.pro.duration} days</span>
-              </div>
-              <ul className="space-y-4 mb-8">
-                {plans.pro.features.map((feature, i) => (
-                  <li key={i} className="flex items-center gap-3 text-gray-300">
-                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                      <svg className="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </span>
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-              <button
-                onClick={() => handleSubscribe('pro')}
-                disabled={processingPayment || status?.subscription?.type === 'pro'}
-                className="w-full py-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
-              >
-                {processingPayment ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : status?.subscription?.type === 'pro' ? (
-                  'Current plan'
-                ) : (
-                  <>
-                    <img src={KHALTI_LOGO} alt="" className="h-5 w-auto" />
-                    Pay with Khalti
-                  </>
-                )}
-              </button>
-            </article>
+          {!paidPlan && (
+            <div className="text-center py-10 text-gray-500 text-sm">No paid plan is available right now.</div>
           )}
+
         </div>
 
         {/* Free tier note */}

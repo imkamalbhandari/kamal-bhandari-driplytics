@@ -1,5 +1,23 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import {
+  ArrowLeftRight,
+  Bell,
+  ChevronDown,
+  CreditCard,
+  Heart,
+  LayoutGrid,
+  LogOut,
+  Menu,
+  MessageSquare,
+  Scale,
+  Search,
+  Shield,
+  Sparkles,
+  TrendingUp,
+  UserRound,
+  X,
+} from 'lucide-react';
 import { paymentAPI } from '../../services/api';
 
 function Navbar() {
@@ -10,7 +28,7 @@ function Navbar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [hasActiveSubscription, setHasActiveSubscription] = useState(null);
   const profileRef = useRef(null);
-  
+
   const user = (() => {
     const userData = localStorage.getItem('user');
     return userData ? JSON.parse(userData) : null;
@@ -41,7 +59,6 @@ function Navbar() {
     return `${API_BASE}${picturePath}`;
   };
 
-  // Close profile dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (profileRef.current && !profileRef.current.contains(e.target)) {
@@ -52,7 +69,6 @@ function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Close menus on route change
   useEffect(() => {
     setMobileMenuOpen(false);
     setProfileOpen(false);
@@ -110,190 +126,163 @@ function Navbar() {
     setShowLogoutConfirm(false);
   };
 
-  // Navigation links — admin sees only Admin Panel, regular users see all features
-  const navLinks = user?.isAdmin ? [
-    { path: '/admin', label: 'Admin Panel', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    )},
-  ] : [
-    { path: '/dashboard', label: 'Dashboard', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-      </svg>
-    )},
-    { path: '/search', label: 'Search', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-      </svg>
-    )},
-    { path: '/trends', label: 'Prediction', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-      </svg>
-    )},
-    { path: '/compare', label: 'Compare', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-      </svg>
-    )},
-    { path: '/favorites', label: 'Favorites', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-      </svg>
-    )},
-    { path: '/trade', label: 'Trade', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-      </svg>
-    )},
-    { path: '/chat', label: 'Chat', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-      </svg>
-    )},
-    { path: '/alerts', label: 'Alerts', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-      </svg>
-    )},
-  ];
+  const navLinks = user?.isAdmin
+    ? [{ path: '/admin', label: 'Admin Panel', icon: Shield }]
+    : [
+        { path: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
+        { path: '/search', label: 'Search', icon: Search },
+        { path: '/trends', label: 'Prediction', icon: TrendingUp },
+        { path: '/compare', label: 'Compare', icon: Scale },
+        { path: '/favorites', label: 'Favorites', icon: Heart },
+        { path: '/trade', label: 'Trade', icon: ArrowLeftRight },
+        { path: '/chat', label: 'Chat', icon: MessageSquare },
+        { path: '/alerts', label: 'Alerts', icon: Bell },
+      ];
 
-  // Check if a link is active
-  const isLinkActive = (link) => {
-    return location.pathname === link.path;
-  };
+  const isLinkActive = (link) => location.pathname === link.path;
 
   return (
-    <nav className="sticky top-0 z-50 bg-[#0a0a0f]/80 backdrop-blur-2xl border-b border-white/[0.06]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link to={user?.isAdmin ? "/admin" : (user ? "/dashboard" : "/")} className="flex items-center gap-2.5 flex-shrink-0 group">
-            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/25 group-hover:shadow-indigo-500/40 transition-all duration-300">
-              <span className="text-white font-bold text-base">D</span>
-            </div>
-            <span className="text-lg font-bold text-white tracking-tight">Driplytics</span>
+    <nav className="sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-bg)]">
+      <div className="mx-auto h-[52px] w-full max-w-[1440px] px-6 max-md:px-4">
+        <div className="flex h-full items-center justify-between gap-4">
+          <Link
+            to={user?.isAdmin ? '/admin' : user ? '/dashboard' : '/'}
+            className="inline-flex items-center gap-2 text-[var(--color-text-primary)]"
+          >
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] font-[var(--font-display)] text-[var(--text-base)] font-[var(--weight-bold)] text-[var(--color-accent)]">
+              D
+            </span>
+            <span className="font-[var(--font-display)] text-[var(--text-md)] font-[var(--weight-bold)] tracking-[var(--tracking-tight)]">
+              Driplytics
+            </span>
           </Link>
 
-          {/* Desktop Navigation */}
           {user && (
-            <div className="hidden lg:flex items-center gap-1">
+            <div className="hidden items-center gap-1 lg:flex">
               {navLinks.map((link) => {
+                const Icon = link.icon;
                 const active = isLinkActive(link);
                 return (
                   <Link
                     key={link.path}
                     to={link.path}
-                    title={link.label}
-                    className={`group relative flex items-center gap-1.5 rounded-xl text-[13px] font-medium transition-all duration-200 ${
+                    className={`relative inline-flex min-h-9 items-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-[var(--text-sm)] transition-colors duration-100 ${
                       active
-                        ? 'bg-indigo-500/15 text-indigo-300 px-3 py-2'
-                        : 'text-gray-500 hover:text-gray-200 hover:bg-white/[0.06] px-2.5 py-2 xl:px-3'
+                        ? 'bg-[var(--color-accent-bg)] text-[var(--color-accent)]'
+                        : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text-primary)]'
                     }`}
                   >
-                    <span className="flex-shrink-0 [&>svg]:w-[18px] [&>svg]:h-[18px]">{link.icon}</span>
-                    <span className={`whitespace-nowrap ${active ? '' : 'hidden xl:inline'}`}>
-                      {link.label}
-                    </span>
                     {active && (
-                      <span className="absolute -bottom-[13px] left-1/2 -translate-x-1/2 w-5 h-[2px] bg-indigo-400 rounded-full" />
+                      <span className="absolute bottom-1 left-0 top-1 w-[2px] rounded-r-sm bg-[var(--color-accent)]" />
                     )}
+                    <Icon size={16} strokeWidth={1.5} className="shrink-0" />
+                    <span>{link.label}</span>
                   </Link>
                 );
               })}
             </div>
           )}
 
-          {/* Right Section */}
           <div className="flex items-center gap-2">
             {user ? (
               <>
-                {/* Upgrade pill for free users */}
                 {isFreeUser && (
                   <Link
                     to="/subscription"
-                    className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/25 text-amber-400 text-xs font-semibold rounded-full hover:from-amber-500/25 hover:to-orange-500/25 hover:text-amber-300 transition-all"
+                    className="hidden items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-accent-dim)] bg-[var(--color-accent-bg)] px-3 py-2 text-[var(--text-xs)] font-[var(--weight-medium)] uppercase tracking-[var(--tracking-wide)] text-[var(--color-accent)] sm:inline-flex"
                   >
-                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    <Sparkles size={16} strokeWidth={1.5} />
                     Upgrade
                   </Link>
                 )}
 
-                {/* Profile Dropdown */}
                 <div className="relative" ref={profileRef}>
                   <button
                     onClick={() => setProfileOpen(!profileOpen)}
-                    className={`flex items-center gap-2 p-1.5 rounded-xl transition-all duration-200 ${
-                      profileOpen || location.pathname === '/profile' ? 'bg-white/10' : 'hover:bg-white/[0.06]'
+                    className={`inline-flex items-center gap-2 rounded-[var(--radius-md)] border px-1.5 py-1 transition-colors duration-100 ${
+                      profileOpen || location.pathname === '/profile'
+                        ? 'border-[var(--color-border-strong)] bg-[var(--color-surface-2)]'
+                        : 'border-[var(--color-border)] bg-transparent hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-2)]'
                     }`}
                   >
                     {user.profilePicture ? (
                       <img
                         src={getProfilePictureUrl(user.profilePicture)}
                         alt={user.username}
-                        className="w-8 h-8 rounded-lg object-cover ring-1 ring-white/20"
+                        className="h-7 w-7 rounded-[var(--radius-md)] object-cover"
                       />
                     ) : (
-                      <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center ring-1 ring-white/20">
-                        <span className="text-white font-semibold text-sm">{user.username?.charAt(0).toUpperCase()}</span>
-                      </div>
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] font-[var(--font-display)] text-[var(--text-sm)] text-[var(--color-accent)]">
+                        {user.username?.charAt(0).toUpperCase()}
+                      </span>
                     )}
-                    <svg className={`w-3.5 h-3.5 text-gray-500 transition-transform duration-200 hidden sm:block ${profileOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <ChevronDown
+                      size={14}
+                      strokeWidth={1.5}
+                      className={`hidden text-[var(--color-text-secondary)] transition-transform sm:block ${profileOpen ? 'rotate-180' : ''}`}
+                    />
                   </button>
 
-                  {/* Dropdown Menu */}
                   {profileOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-64 bg-[#13131f] border border-white/10 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden z-50">
-                      {/* User info header */}
-                      <div className="p-4 border-b border-white/[0.06]">
+                    <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)]">
+                      <div className="border-b border-[var(--color-border)] p-4">
                         <div className="flex items-center gap-3">
                           {user.profilePicture ? (
-                            <img src={getProfilePictureUrl(user.profilePicture)} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                            <img
+                              src={getProfilePictureUrl(user.profilePicture)}
+                              alt=""
+                              className="h-10 w-10 rounded-[var(--radius-md)] object-cover"
+                            />
                           ) : (
-                            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                              <span className="text-white font-semibold">{user.username?.charAt(0).toUpperCase()}</span>
-                            </div>
+                            <span className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border-strong)] bg-[var(--color-surface-2)] font-[var(--font-display)] text-[var(--color-accent)]">
+                              {user.username?.charAt(0).toUpperCase()}
+                            </span>
                           )}
                           <div className="min-w-0 flex-1">
-                            <p className="text-white font-semibold text-sm truncate">{user.username}</p>
-                            <p className="text-gray-500 text-xs truncate">{user.email || 'Sneaker Enthusiast'}</p>
+                            <p className="truncate text-[var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-primary)]">
+                              {user.username}
+                            </p>
+                            <p className="truncate text-[var(--text-xs)] text-[var(--color-text-secondary)]">
+                              {user.email || 'Sneaker Enthusiast'}
+                            </p>
                           </div>
                         </div>
+
                         {isFreeUser && (
-                          <Link to="/subscription" onClick={() => setProfileOpen(false)}
-                            className="mt-3 flex items-center justify-center gap-1.5 w-full px-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-semibold rounded-lg hover:from-indigo-500 hover:to-purple-500 transition-all">
-                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                          <Link
+                            to="/subscription"
+                            onClick={() => setProfileOpen(false)}
+                            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-accent-dim)] bg-[var(--color-accent)] px-3 py-2 text-[var(--text-xs)] font-[var(--weight-medium)] uppercase tracking-[var(--tracking-wide)] text-[var(--color-bg)]"
+                          >
+                            <Sparkles size={14} strokeWidth={1.5} />
                             Upgrade Plan
                           </Link>
                         )}
                       </div>
-                      {/* Menu items */}
+
                       <div className="p-1.5">
-                        <Link to="/profile" onClick={() => setProfileOpen(false)}
-                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-300 hover:text-white hover:bg-white/[0.06] transition-all">
-                          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                          </svg>
+                        <Link
+                          to="/profile"
+                          onClick={() => setProfileOpen(false)}
+                          className="inline-flex w-full items-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-[var(--text-sm)] text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text-primary)]"
+                        >
+                          <UserRound size={16} strokeWidth={1.5} />
                           Profile & Settings
                         </Link>
-                        <Link to="/subscription" onClick={() => setProfileOpen(false)}
-                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-300 hover:text-white hover:bg-white/[0.06] transition-all">
-                          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                          </svg>
+                        <Link
+                          to="/subscription"
+                          onClick={() => setProfileOpen(false)}
+                          className="inline-flex w-full items-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-[var(--text-sm)] text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text-primary)]"
+                        >
+                          <CreditCard size={16} strokeWidth={1.5} />
                           Subscription
                         </Link>
-                        <div className="my-1 mx-2 border-t border-white/[0.06]" />
-                        <button onClick={handleLogoutClick}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                          </svg>
+                        <div className="my-1 h-px bg-[var(--color-border)]" />
+                        <button
+                          onClick={handleLogoutClick}
+                          className="inline-flex w-full items-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-left text-[var(--text-sm)] text-[var(--color-down)] transition-colors hover:bg-[var(--color-surface-2)]"
+                        >
+                          <LogOut size={16} strokeWidth={1.5} />
                           Logout
                         </button>
                       </div>
@@ -301,31 +290,28 @@ function Navbar() {
                   )}
                 </div>
 
-                {/* Mobile menu button */}
                 <button
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="lg:hidden p-2 text-gray-400 hover:text-white hover:bg-white/[0.06] rounded-lg transition-all"
+                  className="inline-flex items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border)] p-2 text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text-primary)] lg:hidden"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    {mobileMenuOpen ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    ) : (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                    )}
-                  </svg>
+                  {mobileMenuOpen ? (
+                    <X size={18} strokeWidth={1.5} />
+                  ) : (
+                    <Menu size={18} strokeWidth={1.5} />
+                  )}
                 </button>
               </>
             ) : (
               <div className="flex items-center gap-2">
                 <Link
                   to="/login"
-                  className="px-4 py-2 text-gray-300 hover:text-white text-sm font-medium transition-all rounded-lg hover:bg-white/[0.06]"
+                  className="inline-flex items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border)] px-4 py-2 text-[var(--text-sm)] font-[var(--weight-medium)] uppercase tracking-[var(--tracking-wide)] text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-border-strong)] hover:text-[var(--color-text-primary)]"
                 >
                   Login
                 </Link>
                 <Link
                   to="/signup"
-                  className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-500/25"
+                  className="inline-flex items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-4 py-2 text-[var(--text-sm)] font-[var(--weight-medium)] uppercase tracking-[var(--tracking-wide)] text-[var(--color-bg)]"
                 >
                   Sign Up
                 </Link>
@@ -334,58 +320,58 @@ function Navbar() {
           </div>
         </div>
 
-        {/* Mobile menu */}
         {user && mobileMenuOpen && (
-          <div className="lg:hidden py-3 border-t border-white/[0.06] space-y-0.5">
+          <div className="border-t border-[var(--color-border)] py-2 lg:hidden">
             {navLinks.map((link) => {
+              const Icon = link.icon;
               const active = isLinkActive(link);
               return (
                 <Link
                   key={link.path}
                   to={link.path}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                  className={`relative mt-1 inline-flex w-full items-center gap-2 rounded-[var(--radius-md)] px-3 py-3 text-[var(--text-sm)] ${
                     active
-                      ? 'bg-indigo-500/15 text-indigo-300'
-                      : 'text-gray-400 hover:text-white hover:bg-white/[0.06]'
+                      ? 'bg-[var(--color-accent-bg)] text-[var(--color-accent)]'
+                      : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text-primary)]'
                   }`}
                 >
-                  <span className="[&>svg]:w-5 [&>svg]:h-5">{link.icon}</span>
+                  {active && (
+                    <span className="absolute bottom-1 left-0 top-1 w-[2px] rounded-r-sm bg-[var(--color-accent)]" />
+                  )}
+                  <Icon size={16} strokeWidth={1.5} />
                   {link.label}
                 </Link>
               );
             })}
-            {isFreeUser && (
-              <Link to="/subscription" onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 text-amber-400 mt-2">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                Upgrade Plan
-              </Link>
-            )}
           </div>
         )}
       </div>
 
-      {/* Logout Confirmation */}
       {showLogoutConfirm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={handleLogoutCancel} />
-          <div className="relative bg-[#151520] border border-white/10 rounded-2xl p-8 max-w-sm w-full shadow-2xl z-10">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--color-bg)]/80 p-4">
+          <div className="w-full max-w-sm rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
             <div className="text-center">
-              <div className="w-14 h-14 bg-red-500/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <svg className="w-7 h-7 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
+              <div className="mx-auto mb-4 inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-2)] text-[var(--color-down)]">
+                <LogOut size={20} strokeWidth={1.5} />
               </div>
-              <h3 className="text-white font-bold text-xl mb-2">Leaving So Soon?</h3>
-              <p className="text-gray-400 text-sm mb-6">Are you sure you want to logout?</p>
-              <div className="flex gap-3">
-                <button onClick={handleLogoutCancel}
-                  className="flex-1 px-4 py-2.5 bg-white/10 text-white rounded-xl hover:bg-white/15 transition-all font-medium text-sm border border-white/10">
+              <h3 className="font-[var(--font-display)] text-[var(--text-lg)] font-[var(--weight-bold)] text-[var(--color-text-primary)]">
+                Confirm Logout
+              </h3>
+              <p className="mt-2 text-[var(--text-sm)] text-[var(--color-text-secondary)]">
+                Are you sure you want to logout?
+              </p>
+              <div className="mt-5 flex gap-2">
+                <button
+                  onClick={handleLogoutCancel}
+                  className="inline-flex flex-1 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-2 text-[var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+                >
                   Stay
                 </button>
-                <button onClick={handleLogoutConfirm}
-                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-500 transition-all font-medium text-sm shadow-lg shadow-red-500/30">
+                <button
+                  onClick={handleLogoutConfirm}
+                  className="inline-flex flex-1 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-down)] px-3 py-2 text-[var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-down)]"
+                >
                   Logout
                 </button>
               </div>

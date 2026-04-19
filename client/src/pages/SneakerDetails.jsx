@@ -735,13 +735,6 @@ function SneakerDetails() {
                         </div>
                         <span className="text-violet-300 font-bold">रू 299</span>
                       </div>
-                      <div className="flex items-center justify-between p-3 rounded-xl bg-purple-500/10 border border-purple-500/30">
-                        <div>
-                          <p className="text-white font-semibold text-sm">Pro</p>
-                          <p className="text-gray-400 text-xs">Unlimited + API access, 90 days</p>
-                        </div>
-                        <span className="text-purple-300 font-bold">रू 799</span>
-                      </div>
                     </div>
 
                     {/* CTA buttons */}

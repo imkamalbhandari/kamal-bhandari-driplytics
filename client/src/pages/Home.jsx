@@ -41,31 +41,6 @@ function Home() {
   // Landing page for non-logged-in users
   return (
     <div className="min-h-screen w-full flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-black relative overflow-hidden">
-      {/* Logout Success Toast */}
-      {showLogoutToast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-slide-down">
-          <div className="flex items-center gap-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-4 rounded-xl shadow-2xl shadow-green-500/30 border border-green-400/20 backdrop-blur-sm">
-            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <div>
-              <p className="font-semibold text-lg">Logged Out Successfully</p>
-              <p className="text-green-100 text-sm">See you next time!</p>
-            </div>
-            <button 
-              onClick={() => setShowLogoutToast(false)}
-              className="ml-4 p-1 hover:bg-white/20 rounded-full transition-all"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Animated background elements */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-20 left-10 w-72 h-72 bg-white/5 rounded-full blur-3xl animate-float-slow"></div>
@@ -110,6 +85,35 @@ function Home() {
 
       {/* Main Content - Landing Page */}
       <main className="relative z-10 flex-1 flex flex-col justify-center w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        {showLogoutToast && (
+          <div className="mb-8 flex justify-center animate-fade-in">
+            <div className="w-full max-w-2xl rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-4 backdrop-blur-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20">
+                    <svg className="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-emerald-200 font-semibold">Logged Out Successfully</p>
+                    <p className="text-emerald-100/80 text-sm">See you next time.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowLogoutToast(false)}
+                  className="p-1 rounded-md text-emerald-200/70 hover:text-emerald-100 hover:bg-emerald-500/20 transition-all"
+                  aria-label="Dismiss logout status"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="text-center">
           <div className="inline-flex items-center gap-2 bg-indigo-600/20 border border-indigo-500/30 rounded-full px-5 py-2.5 mb-8 animate-fade-in backdrop-blur-sm shadow-lg shadow-indigo-500/10">
             <span className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse"></span>
